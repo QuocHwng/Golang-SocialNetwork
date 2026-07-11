@@ -1,0 +1,106 @@
+Nhìn vào 2 bức ảnh của bạn, tôi hiểu cách bạn đang tổ chức. Bạn đang sử dụng
+kiến trúc Monorepo (gộp cả frontend và backend vào chung 1 git repository) và ở
+backend, bạn đang chia thư mục theo dạng Layered Architecture (Kiến trúc phân
+tầng) kết hợp chia nhỏ các file DTO/Model (như user_dto, user_model,
+controllers, services,...).
+
+Đánh giá cấu trúc hiện tại của bạn:
+
+  - Ưu điểm: Đã biết tách biệt Controller, Service, Entity. Đã sử dụng thư mục
+    internal (một best practice của Go để bảo vệ code).
+  - Nhược điểm (để làm một dự án chuyên nghiệp & lớn): Cách chia thư mục như
+    ảnh 2 (gom tất cả controllers vào 1 cục, tất cả services vào 1 cục, rồi lại
+    đẻ ra vô số thư mục _dto, _model cho từng bảng) sẽ gây ra hiện tượng "Bùng
+    nổ thư mục". Khi dự án to lên (thêm Like, Comment, Notification, Follow,
+    Chat...), bạn sẽ phải mở 4-5 thư mục khác nhau chỉ để sửa 1 tính năng của
+    Post. Cấu trúc src/backend cũng mang hơi hướng của Java/NodeJS hơn là chuẩn
+    của Golang.
+
+Để xây dựng một mạng xã hội thu nhỏ thật sự chuyên nghiệp, chuẩn Go và cực kỳ dễ
+scale (mở rộng), chúng ta nên áp dụng Domain-Driven Design (DDD) kết hợp với Go
+Standard Project Layout.
+
+Nghĩa là: Thay vì chia theo loại file (Controller, Service...), ta sẽ chia theo
+Tính năng (Feature/Module).
+
+Dưới đây là cấu trúc tôi đề xuất cho bạn, đảm bảo xịn như các team Golang ở các
+công ty công nghệ lớn đang dùng:
+
+Cấu trúc thư mục tối ưu (Standard Go Layout + Module Based)
+
+social-network/                 <-- Root của dự án (Monorepo)
+├── frontend/                   <-- Source code ReactJS (Vite, Tailwind...)
+├── backend/                    <-- Source code Golang
+│   ├── cmd/
+│   │   └── api/
+│   │       └── main.go         <-- File chạy chính của App. Chỉ chứa logic khởi tạo (Init DB, Router, Start Server).
+│   │
+│   ├── internal/               <-- Code logic chính (Go không cho phép project khác import thư mục này)
+│   │   ├── config/             <-- Load biến môi trường (.env), config database, JWT...
+│   │   ├── middleware/         <-- Auth Middleware, Logger, CORS, Rate Limit...
+│   │   ├── server/             <-- Nơi khai báo Router tổng (tập hợp API của các module)
+│   │   │
+│   │   ├── module/             <-- CÁC TÍNH NĂNG CHÍNH ĐƯỢC CHIA THEO DOMAIN (rất gọn gàng)
+│   │   │   ├── user/           <-- Xử lý User, Profile, Auth
+│   │   │   │   ├── handler.go  <-- Tương đương Controller (Nhận Request, trả Response JSON)
+│   │   │   │   ├── service.go  <-- Business Logic (Validate, xử lý nghiệp vụ)
+│   │   │   │   ├── repo.go     <-- Query Database (SQL)
+│   │   │   │   └── dto.go      <-- Khai báo Struct cho Request/Response body
+│   │   │   │
+│   │   │   ├── post/           <-- Xử lý Post, Media
+│   │   │   │   ├── handler.go
+│   │   │   │   ├── service.go
+│   │   │   │   └── repo.go
+│   │   │   │
+│   │   │   ├── interaction/    <-- Xử lý Like, Comment, Follow
+│   │   │   │   ├── handler.go
+│   │   │   │   ├── service.go
+│   │   │   │   └── repo.go
+│   │   │   │
+│   │   │   └── notification/   <-- Xử lý Thông báo & Websocket
+│   │   │       ├── handler.go
+│   │   │       ├── service.go
+│   │   │       └── websocket.go
+│   │   │
+│   │   └── pkg/                <-- Các thư viện dùng chung cho toàn bộ app
+│   │       ├── database/       <-- Setup connection PostgreSQL (GORM hoặc pgx)
+│   │       ├── jwt/            <-- Hàm generate/verify token
+│   │       ├── response/       <-- Hàm format JSON trả về cho chuẩn (Success, Error)
+│   │       └── s3/             <-- Upload file lên Cloud
+│   │
+│   ├── migrations/             <-- Chứa các file .sql để tạo/sửa bảng (như script tôi vừa gửi)
+│   ├── go.mod
+│   └── go.sum
+│
+├── docker-compose.yml          <-- Khởi tạo Postgres, Redis cục bộ cho dev
+└── .gitignore
+
+Tại sao cấu trúc này lại "Chuyên nghiệp" và tốt hơn ảnh của bạn?
+
+1.  Tính đóng gói cao: Nếu bạn muốn sửa tính năng Bài viết (Post), bạn chỉ cần
+    vào đúng folder internal/module/post/. Trong đó đã có đủ handler (API),
+    service (Logic), repo (DB) và dto (Struct). Không phải chạy lăng xăng đi tìm
+    file ở thư mục khác.
+2.  cmd/api/main.go: Tách biệt rõ ràng điểm bắt đầu của ứng dụng. main.go của
+    bạn sẽ cực kỳ sạch sẽ, không chứa logic nghiệp vụ, chỉ có tác dụng kết nối
+    các thành phần lại và bấm nút "Start".
+3.  internal/pkg: Tách biệt các công cụ (tool) ra khỏi logic nghiệp vụ. Database
+    hay JWT là công cụ, có thể dùng lại ở bất cứ đâu.
+4.  Không bị "lan man": Cách gom nhóm Like, Comment, Follow vào chung một module
+    interaction giúp quản lý các tương tác của User cực kỳ tập trung.
+
+Bắt tay vào Code Backend nhé?
+
+Nếu bạn đồng ý với cấu trúc này, chúng ta sẽ bắt đầu tạo nó ngay bây giờ.
+
+Bước tiếp theo tôi đề xuất (Bạn hãy làm theo thứ tự):
+
+1.  Mở Terminal, cd backend, chạy go mod init <tên-project-của-bạn>.
+2.  Tạo cấu trúc thư mục như trên.
+3.  Chúng ta sẽ viết file kết nối Database PostgreSQL (trong
+    internal/pkg/database/db.go) và file format Response chuẩn chỉnh trước tiên,
+    vì đây là "xương sống" cho mọi API sau này.
+
+Bạn đã sẵn sàng để tôi viết code cho phần Kết nối Database và Chuẩn hóa Response
+chưa? Bạn định dùng GORM (ORM phổ biến nhất) hay sqlc/pgx (Viết SQL thuần, hiệu
+năng nhanh nhất)?
