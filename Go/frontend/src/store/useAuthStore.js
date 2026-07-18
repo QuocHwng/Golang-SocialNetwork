@@ -19,6 +19,10 @@ const useAuthStore = create((set) => ({
         localStorage.removeItem('token');
         set({ user: null, token: null, isAuthenticated: false });
     },
+    updateUser: (newUserData) => {
+        localStorage.setItem('user', JSON.stringify(newUserData));
+        set({ user: newUserData });
+    }
 }));
 
 // DÒNG QUAN TRỌNG ĐỂ XUẤT FILE NÀY RA CHO LOGIN DÙNG:

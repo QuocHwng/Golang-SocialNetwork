@@ -2,38 +2,43 @@ package post
 
 import "time"
 
-// Dữ liệu ReactJS gửi lên khi đăng bài
 type CreatePostRequest struct {
-	Content      string  `json:"content" binding:"required"`
-	SharedPostID *string `json:"shared_post_id,omitempty"`
-	// Tạm thời ta làm content text trước, phần upload ảnh Media ta sẽ làm sau để tránh phức tạp
+	Content      string   `json:"content"`
+	SharedPostID *string  `json:"shared_post_id,omitempty"`
+	MediaURLs    []string `json:"media_urls"` // THÊM MỚI: Danh sách link ảnh/video
 }
 
-// Dữ liệu Backend trả về cho ReactJS
 type PostResponse struct {
 	ID            string    `json:"id"`
 	UserID        string    `json:"user_id"`
 	Content       string    `json:"content"`
+	SharedPostID  *string   `json:"shared_post_id,omitempty"`
+	MediaURLs     []string  `json:"media_urls,omitempty"`
 	LikesCount    int       `json:"likes_count"`
 	CommentsCount int       `json:"comments_count"`
-	CreatedAt     time.Time `json:"created_at"`
-	SharedPostID  *string   `json:"shared_post_id,omitempty"`
 	SharesCount   int       `json:"shares_count"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
-// Cấu trúc thông tin tác giả trả về cho ReactJS
 type AuthorInfo struct {
 	ID        string `json:"id"`
 	FullName  string `json:"full_name"`
 	AvatarURL string `json:"avatar_url"`
 }
 
-// Cấu trúc Bài viết hoàn chỉnh hiển thị trên bảng tin
+// THÊM MỚI: Cấu trúc trả về Ảnh/Video
+type MediaInfo struct {
+	ID        string `json:"id"`
+	MediaURL  string `json:"media_url"`
+	MediaType string `json:"media_type"`
+}
+
 type FeedPostResponse struct {
 	ID            string            `json:"id"`
 	Author        AuthorInfo        `json:"author"`
 	Content       string            `json:"content"`
-	SharedPost    *FeedPostResponse `json:"shared_post,omitempty"` // Bài gốc lồng bên trong
+	SharedPost    *FeedPostResponse `json:"shared_post,omitempty"`
+	Media         []MediaInfo       `json:"media"` // THÊM MỚI
 	LikesCount    int               `json:"likes_count"`
 	CommentsCount int               `json:"comments_count"`
 	SharesCount   int               `json:"shares_count"`
