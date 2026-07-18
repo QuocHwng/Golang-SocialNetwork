@@ -16,6 +16,7 @@ import (
 func SetupRouter() *gin.Engine {
 	// Khởi tạo Gin
 	r := gin.Default()
+	r.Static("/uploads", "./uploads")
 
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowAllOrigins = true // Cho phép mọi Frontend truy cập (Dùng khi Dev)
@@ -70,6 +71,16 @@ func SetupRouter() *gin.Engine {
 
 		protected.GET("/ws", notification.ServeWS)
 		protected.GET("/posts/:id", postHandler.GetPostByID)
+
+		protected.GET("/users/search", userHandler.SearchUsers)
+		protected.GET("/users/:id", userHandler.GetUserProfile)
+		protected.GET("/users/:id/posts", postHandler.GetUserPosts)
+
+		protected.POST("/upload", postHandler.UploadMedia)
+
+		// Thêm vào chỗ // User Profile & Search:
+		protected.PUT("/profile", userHandler.UpdateProfile)
+		protected.DELETE("/posts/:id", postHandler.DeletePost)
 
 	}
 

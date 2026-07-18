@@ -6,8 +6,6 @@ import (
 	"gorm.io/gorm"
 )
 
-
-// User là Model ánh xạ (map) trực tiếp với bảng `users` trong PostgreSQL
 type User struct {
 	ID             string `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	Username       string `gorm:"unique;not null"`
@@ -22,44 +20,48 @@ type User struct {
 	UpdatedAt      time.Time
 }
 
-// Interface định nghĩa các hàm mà Repo này có thể làm (Chuẩn chuyên nghiệp của Go)
 type UserRepository interface {
 	CreateUser(user *User) error
 	FindByEmail(email string) (*User, error)
 	FindByUsername(username string) (*User, error)
-
 	FindByID(id string) (*User, error)
+	SearchUsers(keyword string) ([]User, error)
+	CheckIsFollowing(followerID, followingID string) bool
+	UpdateProfile(userID string, data map[string]interface{}) error // MỚI
 }
 
-type userRepo struct {
-	db *gorm.DB
-}
+type userRepo struct{ db *gorm.DB }
 
-// NewUserRepository là hàm khởi tạo
-func NewUserRepository(db *gorm.DB) UserRepository {
-	return &userRepo{db: db}
-}
+func NewUserRepository(db *gorm.DB) UserRepository { return &userRepo{db: db} }
 
-// --- Các hàm thao tác với DB ---
-
-func (r *userRepo) CreateUser(user *User) error {
-	return r.db.Create(user).Error
-}
-
+func (r *userRepo) CreateUser(user *User) error { return r.db.Create(user).Error }
 func (r *userRepo) FindByEmail(email string) (*User, error) {
 	var user User
 	err := r.db.Where("email = ?", email).First(&user).Error
 	return &user, err
 }
-
 func (r *userRepo) FindByUsername(username string) (*User, error) {
 	var user User
 	err := r.db.Where("username = ?", username).First(&user).Error
 	return &user, err
 }
-
 func (r *userRepo) FindByID(id string) (*User, error) {
 	var user User
 	err := r.db.Where("id = ?", id).First(&user).Error
 	return &user, err
+}
+func (r *userRepo) SearchUsers(keyword string) ([]User, error) {
+	var users []User
+	err := r.db.Where("username ILIKE ? OR full_name ILIKE ?", "%"+keyword+"%", "%"+keyword+"%").Limit(10).Find(&users).Error
+	return users, err
+}
+func (r *userRepo) CheckIsFollowing(followerID, followingID string) bool {
+	var count int64
+	r.db.Table("follows").Where("follower_id = ? AND following_id = ?", followerID, followingID).Count(&count)
+	return count > 0
+}
+
+// MỚI: Cập nhật thông tin
+func (r *userRepo) UpdateProfile(userID string, data map[string]interface{}) error {
+	return r.db.Model(&User{}).Where("id = ?", userID).Updates(data).Error
 }

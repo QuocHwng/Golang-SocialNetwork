@@ -67,3 +67,48 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 
 	response.Success(c, http.StatusOK, "Lấy thông tin profile thành công", res)
 }
+
+// Xem trang cá nhân của ai đó (GET /users/:id)
+func (h *UserHandler) GetUserProfile(c *gin.Context) {
+	currentUserID, _ := c.Get("user_id")
+	targetUserID := c.Param("id")
+
+	res, err := h.service.GetUserProfile(targetUserID, currentUserID.(string))
+	if err != nil {
+		response.Error(c, http.StatusNotFound, err.Error())
+		return
+	}
+	response.Success(c, http.StatusOK, "Thành công", res)
+}
+
+// Tìm kiếm người dùng (GET /users/search?q=...)
+func (h *UserHandler) SearchUsers(c *gin.Context) {
+	keyword := c.Query("q")
+	if keyword == "" {
+		response.Success(c, http.StatusOK, "Thành công", []UserProfileResponse{})
+		return
+	}
+
+	res, err := h.service.SearchUsers(keyword)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.Success(c, http.StatusOK, "Thành công", res)
+}
+
+// Sửa thông tin cá nhân (PUT /profile)
+func (h *UserHandler) UpdateProfile(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	var req UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "Dữ liệu không hợp lệ")
+		return
+	}
+	res, err := h.service.UpdateProfile(userID.(string), req)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.Success(c, http.StatusOK, "Cập nhật thành công", res)
+}
