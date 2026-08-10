@@ -89,3 +89,31 @@ func (h *InteractionHandler) ToggleFollow(c *gin.Context) {
 
 	response.Success(c, http.StatusOK, msg, res)
 }
+
+// Sửa bình luận (PUT /comments/:id)
+func (h *InteractionHandler) UpdateComment(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	commentID := c.Param("id")
+	var req CreateCommentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "Dữ liệu không hợp lệ")
+		return
+	}
+
+	if err := h.service.UpdateComment(commentID, userID.(string), req); err != nil {
+		response.Error(c, http.StatusForbidden, err.Error())
+		return
+	}
+	response.Success(c, http.StatusOK, "Đã cập nhật bình luận", nil)
+}
+
+// Xóa bình luận (DELETE /comments/:id)
+func (h *InteractionHandler) DeleteComment(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	commentID := c.Param("id")
+	if err := h.service.DeleteComment(commentID, userID.(string)); err != nil {
+		response.Error(c, http.StatusForbidden, err.Error())
+		return
+	}
+	response.Success(c, http.StatusOK, "Đã xóa bình luận", nil)
+}
