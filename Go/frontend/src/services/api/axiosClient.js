@@ -1,10 +1,8 @@
 import axios from 'axios';
 
 const axiosClient = axios.create({
-    baseURL: 'http://localhost:8080/api/v1', // Trỏ thẳng vào Backend Go
-    headers: {
-        'Content-Type': 'application/json',
-    },
+    baseURL: 'http://localhost:8080/api/v1', // Trỏ thẳng vào Backend Go của ta
+    // ĐÃ XÓA CÁI BLOCK HEADERS Ở ĐÂY ĐỂ AXIOS TỰ DO QUYẾT ĐỊNH
 });
 
 // Interceptor: Đứng giữa để tự động nhét Token vào mọi Request
@@ -21,5 +19,4 @@ axiosClient.interceptors.request.use(
     }
 );
 
-// DÒNG QUAN TRỌNG NHẤT ĐÂY (export default):
 export default axiosClient;

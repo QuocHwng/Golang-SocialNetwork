@@ -1,20 +1,24 @@
 package post
 
 import (
-	"fmt"
+	"context"
 	"net/http"
-	"os"
-	"path/filepath"
-	"social-network/internal/pkg/response"
 	"strconv"
-	"time"
 
+	"social-network/internal/pkg/response"
+
+	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/gin-gonic/gin"
 )
 
-type PostHandler struct{ service PostService }
+type PostHandler struct {
+	service PostService
+}
 
-func NewPostHandler(service PostService) *PostHandler { return &PostHandler{service: service} }
+func NewPostHandler(service PostService) *PostHandler {
+	return &PostHandler{service: service}
+}
 
 func (h *PostHandler) CreatePost(c *gin.Context) {
 	userID, _ := c.Get("user_id")
@@ -46,7 +50,6 @@ func (h *PostHandler) GetNewsFeed(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Tải bảng tin thành công", res)
 }
 
-// MỚI: Lấy bài viết của 1 người cụ thể (Dùng cho Trang cá nhân)
 func (h *PostHandler) GetUserPosts(c *gin.Context) {
 	targetUserID := c.Param("id")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -72,35 +75,6 @@ func (h *PostHandler) GetPostByID(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Thành công", res)
 }
 
-// API Upload File (Ảnh/Video)
-func (h *PostHandler) UploadMedia(c *gin.Context) {
-	file, err := c.FormFile("file")
-	if err != nil {
-		response.Error(c, http.StatusBadRequest, "Không tìm thấy file tải lên")
-		return
-	}
-
-	// Tạo thư mục uploads ở Backend nếu chưa có
-	if _, err := os.Stat("uploads"); os.IsNotExist(err) {
-		os.Mkdir("uploads", os.ModePerm)
-	}
-
-	// Đổi tên file để không bao giờ bị trùng
-	ext := filepath.Ext(file.Filename)
-	newName := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
-	savePath := filepath.Join("uploads", newName)
-
-	if err := c.SaveUploadedFile(file, savePath); err != nil {
-		response.Error(c, http.StatusInternalServerError, "Lỗi khi lưu file")
-		return
-	}
-
-	// Trả về link để Frontend hiển thị và lưu vào DB
-	mediaURL := "http://localhost:8080/uploads/" + newName
-	response.Success(c, http.StatusOK, "Upload thành công", gin.H{"url": mediaURL})
-}
-
-// Xóa bài viết (DELETE /posts/:id)
 func (h *PostHandler) DeletePost(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	postID := c.Param("id")
@@ -110,4 +84,59 @@ func (h *PostHandler) DeletePost(c *gin.Context) {
 		return
 	}
 	response.Success(c, http.StatusOK, "Đã xóa bài viết", nil)
+}
+
+func (h *PostHandler) UpdatePost(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	postID := c.Param("id")
+	var req CreatePostRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "Dữ liệu không hợp lệ")
+		return
+	}
+
+	err := h.service.UpdatePost(postID, userID.(string), req.Content)
+	if err != nil {
+		response.Error(c, http.StatusForbidden, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Đã cập nhật bài viết", nil)
+}
+
+// =========================================================================
+// HÀM UPLOAD MEDIA LÊN CLOUDINARY (Xịn xò nhất)
+// =========================================================================
+func (h *PostHandler) UploadMedia(c *gin.Context) {
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "Không tìm thấy file tải lên")
+		return
+	}
+	defer file.Close()
+
+	cld, err := cloudinary.New()
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "Lỗi kết nối Cloudinary: "+err.Error())
+		return
+	}
+
+	resourceType := "image"
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "video/mp4" || contentType == "video/webm" || contentType == "video/quicktime" {
+		resourceType = "video"
+	}
+
+	ctx := context.Background()
+	uploadResult, err := cld.Upload.Upload(ctx, file, uploader.UploadParams{
+		Folder:       "social_network",
+		ResourceType: resourceType,
+	})
+
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "Lỗi khi đẩy file lên Cloud: "+err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Upload thành công", gin.H{"url": uploadResult.SecureURL})
 }

@@ -71,6 +71,7 @@ func SetupRouter() *gin.Engine {
 
 		protected.GET("/ws", notification.ServeWS)
 		protected.GET("/posts/:id", postHandler.GetPostByID)
+		protected.PUT("/posts/:id", postHandler.UpdatePost)
 
 		protected.GET("/users/search", userHandler.SearchUsers)
 		protected.GET("/users/:id", userHandler.GetUserProfile)
@@ -81,6 +82,9 @@ func SetupRouter() *gin.Engine {
 		// Thêm vào chỗ // User Profile & Search:
 		protected.PUT("/profile", userHandler.UpdateProfile)
 		protected.DELETE("/posts/:id", postHandler.DeletePost)
+
+		protected.PUT("/comments/:id", interactionHandler.UpdateComment)    // <-- THÊM DÒNG NÀY (Sửa cmt)
+		protected.DELETE("/comments/:id", interactionHandler.DeleteComment) // <-- THÊM DÒNG NÀY (Xóa cmt)
 
 	}
 

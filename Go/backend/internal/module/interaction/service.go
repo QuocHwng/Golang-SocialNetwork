@@ -10,6 +10,8 @@ type InteractionService interface {
 	CreateComment(postID string, userID string, req CreateCommentRequest) (*CommentResponse, error)
 	GetComments(postID string) ([]CommentResponse, error)
 	ToggleFollow(followerID string, followingID string) (*ToggleFollowResponse, error)
+	UpdateComment(commentID string, userID string, req CreateCommentRequest) error
+	DeleteComment(commentID string, userID string) error
 }
 
 type interactionService struct {
@@ -22,48 +24,72 @@ func NewInteractionService(repo InteractionRepository) InteractionService {
 
 func (s *interactionService) ToggleLike(postID string, userID string) (*ToggleLikeResponse, error) {
 	isLiked, err := s.repo.ToggleLike(postID, userID)
-	if err != nil { return nil, errors.New("lỗi thao tác") }
-	
+	if err != nil {
+		return nil, errors.New("lỗi thao tác")
+	}
+
 	// (Đáng lẽ phải query chủ bài viết, nhưng ta lấy tạm để minh họa)
 	// PUSH REALTIME MESSAGE (Khi React online, màn hình sẽ rung lên)
 	if isLiked {
 		// Ta sẽ gửi một tín hiệu nhỏ để ReactJS biết mà gọi API load lại danh sách thông báo
 		notification.SharedHub.SendToUser(userID, map[string]string{
-			"event": "NEW_NOTIFICATION",
+			"event":   "NEW_NOTIFICATION",
 			"message": "Có người vừa tương tác với bạn",
 		})
 	}
-	return &ToggleLikeResponse{ PostID: postID, IsLiked: isLiked }, nil
+	return &ToggleLikeResponse{PostID: postID, IsLiked: isLiked}, nil
 }
 
 func (s *interactionService) CreateComment(postID string, userID string, req CreateCommentRequest) (*CommentResponse, error) {
-	newComment := &Comment{ PostID: postID, UserID: userID, Content: req.Content, ParentID: req.ParentID }
-	if err := s.repo.CreateComment(newComment); err != nil { return nil, errors.New("lỗi gửi bình luận") }
-	return &CommentResponse{ ID: newComment.ID, PostID: newComment.PostID, Content: newComment.Content, ParentID: newComment.ParentID, CreatedAt: newComment.CreatedAt }, nil
+	newComment := &Comment{PostID: postID, UserID: userID, Content: req.Content, ParentID: req.ParentID}
+	if err := s.repo.CreateComment(newComment); err != nil {
+		return nil, errors.New("lỗi gửi bình luận")
+	}
+	return &CommentResponse{ID: newComment.ID, PostID: newComment.PostID, Content: newComment.Content, ParentID: newComment.ParentID, CreatedAt: newComment.CreatedAt}, nil
 }
 
 func (s *interactionService) GetComments(postID string) ([]CommentResponse, error) {
 	comments, err := s.repo.GetCommentsByPostID(postID)
-	if err != nil { return nil, errors.New("không thể tải bình luận") }
+	if err != nil {
+		return nil, errors.New("không thể tải bình luận")
+	}
 	var result []CommentResponse
 	for _, c := range comments {
-		result = append(result, CommentResponse{ ID: c.ID, PostID: c.PostID, Content: c.Content, ParentID: c.ParentID, Author: CommentAuthorInfo{ ID: c.Author.ID, FullName: c.Author.FullName, AvatarURL: c.Author.AvatarURL }, CreatedAt: c.CreatedAt })
+		result = append(result, CommentResponse{ID: c.ID, PostID: c.PostID, Content: c.Content, ParentID: c.ParentID, Author: CommentAuthorInfo{ID: c.Author.ID, FullName: c.Author.FullName, AvatarURL: c.Author.AvatarURL}, CreatedAt: c.CreatedAt})
 	}
 	return result, nil
 }
 
 func (s *interactionService) ToggleFollow(followerID string, followingID string) (*ToggleFollowResponse, error) {
-	if followerID == followingID { return nil, errors.New("bạn không thể tự theo dõi chính mình") }
+	if followerID == followingID {
+		return nil, errors.New("bạn không thể tự theo dõi chính mình")
+	}
 	isFollowing, err := s.repo.ToggleFollow(followerID, followingID)
-	if err != nil { return nil, errors.New("lỗi thao tác") }
+	if err != nil {
+		return nil, errors.New("lỗi thao tác")
+	}
 
 	// PUSH REALTIME: Báo cho người được theo dõi biết ngay lập tức!
 	if isFollowing {
 		notification.SharedHub.SendToUser(followingID, map[string]string{
-			"event": "NEW_NOTIFICATION",
+			"event":   "NEW_NOTIFICATION",
 			"message": "Có người vừa follow bạn!",
 		})
 	}
 
-	return &ToggleFollowResponse{ UserID: followingID, IsFollowing: isFollowing }, nil
+	return &ToggleFollowResponse{UserID: followingID, IsFollowing: isFollowing}, nil
+}
+
+func (s *interactionService) UpdateComment(commentID string, userID string, req CreateCommentRequest) error {
+	if err := s.repo.UpdateComment(commentID, userID, req.Content); err != nil {
+		return errors.New("bạn không có quyền sửa bình luận này")
+	}
+	return nil
+}
+
+func (s *interactionService) DeleteComment(commentID string, userID string) error {
+	if err := s.repo.DeleteComment(commentID, userID); err != nil {
+		return errors.New("bạn không có quyền xóa bình luận này")
+	}
+	return nil
 }

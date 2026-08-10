@@ -44,6 +44,8 @@ type InteractionRepository interface {
 	CreateComment(comment *Comment) error
 	GetCommentsByPostID(postID string) ([]Comment, error)
 	ToggleFollow(followerID string, followingID string) (bool, error)
+	UpdateComment(commentID string, userID string, content string) error
+	DeleteComment(commentID string, userID string) error
 }
 
 type interactionRepo struct {
@@ -173,4 +175,32 @@ func (r *interactionRepo) ToggleFollow(followerID string, followingID string) (b
 		return nil
 	})
 	return isFollowing, err
+}
+
+func (r *interactionRepo) UpdateComment(commentID string, userID string, content string) error {
+	res := r.db.Model(&Comment{}).Where("id = ? AND user_id = ?", commentID, userID).Update("content", content)
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+func (r *interactionRepo) DeleteComment(commentID string, userID string) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var cmt Comment
+		if err := tx.Where("id = ? AND user_id = ?", commentID, userID).First(&cmt).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&cmt).Error; err != nil {
+			return err
+		}
+		// Xóa xong phải trừ comments_count đi 1
+		if err := tx.Exec("UPDATE posts SET comments_count = comments_count - 1 WHERE id = ?", cmt.PostID).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }

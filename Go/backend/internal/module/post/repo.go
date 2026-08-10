@@ -43,7 +43,8 @@ type PostRepository interface {
 	GetNewsFeed(userID string, limit int, offset int) ([]Post, error)
 	GetPostsByUserID(userID string, limit int, offset int) ([]Post, error)
 	GetPostByID(postID string) (*Post, error)
-	DeletePost(postID string, userID string) error // Đã thêm hàm Xóa
+	DeletePost(postID string, userID string) error
+	UpdatePost(postID string, userID string, content string) error // MỚI
 }
 
 type postRepo struct{ db *gorm.DB }
@@ -55,31 +56,35 @@ func (r *postRepo) CreatePostMedia(media *PostMedia) error { return r.db.Create(
 func (r *postRepo) IncrementShareCount(postID string) error {
 	return r.db.Model(&Post{}).Where("id = ?", postID).UpdateColumn("shares_count", gorm.Expr("shares_count + ?", 1)).Error
 }
-
 func (r *postRepo) GetNewsFeed(userID string, limit int, offset int) ([]Post, error) {
 	var posts []Post
-	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").
-		Where("user_id = ? OR user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)", userID, userID).
-		Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
+	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").Where("user_id = ? OR user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)", userID, userID).Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
 	return posts, err
 }
-
 func (r *postRepo) GetPostsByUserID(userID string, limit int, offset int) ([]Post, error) {
 	var posts []Post
-	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").
-		Where("user_id = ?", userID).Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
+	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").Where("user_id = ?", userID).Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
 	return posts, err
 }
-
 func (r *postRepo) GetPostByID(postID string) (*Post, error) {
 	var post Post
 	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").Where("id = ?", postID).First(&post).Error
 	return &post, err
 }
-
-// LOGIC XÓA BÀI VIẾT TỪ DB
 func (r *postRepo) DeletePost(postID string, userID string) error {
 	res := r.db.Where("id = ? AND user_id = ?", postID, userID).Delete(&Post{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
+}
+
+// HÀM MỚI
+func (r *postRepo) UpdatePost(postID string, userID string, content string) error {
+	res := r.db.Model(&Post{}).Where("id = ? AND user_id = ?", postID, userID).Update("content", content)
 	if res.Error != nil {
 		return res.Error
 	}

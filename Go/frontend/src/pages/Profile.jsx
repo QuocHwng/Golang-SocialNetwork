@@ -14,76 +14,45 @@ const Profile = () => {
 
     const isMyProfile = currentUser?.id === id;
 
-    // --- State cho Cuộn vô tận (Infinite Scroll) ---
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
 
-    // --- State cho Đăng Bài ---
     const [newPostContent, setNewPostContent] = useState('');
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [previews, setPreviews] = useState([]);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef(null);
 
-    // --- State cho Bình luận ---
     const [activeCommentPostId, setActiveCommentPostId] = useState(null);
     const [comments, setComments] = useState({});
     const [newComment, setNewComment] = useState('');
 
-    // --- State cho Edit Profile ---
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({ full_name: '', bio: '', avatar_url: '' });
     const avatarInputRef = useRef(null);
 
-    // =================================================================
-    // 1. LOGIC TẢI DỮ LIỆU & CUỘN VÔ TẬN
-    // =================================================================
-
-    // A. Chỉ tải thông tin Profile 1 lần khi đổi người
     useEffect(() => {
         axiosClient.get(`/users/${id}`)
             .then(res => {
                 setProfile(res.data.data);
-                setEditData({ 
-                    full_name: res.data.data.full_name, 
-                    bio: res.data.data.bio || '', 
-                    avatar_url: res.data.data.avatar_url || '' 
-                });
+                setEditData({ full_name: res.data.data.full_name, bio: res.data.data.bio || '', avatar_url: res.data.data.avatar_url || '' });
             })
-            .catch(err => console.error("Lỗi tải thông tin user"));
+            .catch(err => console.error(err));
     }, [id]);
 
-    // B. Hàm tải bài viết có phân trang
     const fetchUserPosts = async (pageNum) => {
-        if (pageNum === 1) setLoading(true); 
-        else setLoadingMore(true);
-
+        if (pageNum === 1) setLoading(true); else setLoadingMore(true);
         try {
             const res = await axiosClient.get(`/users/${id}/posts?page=${pageNum}&limit=5`);
             const newPosts = res.data.data || [];
-            
-            if (pageNum === 1) {
-                setPosts(newPosts);
-            } else {
-                setPosts(prev => [...prev, ...newPosts]);
-            }
+            if (pageNum === 1) setPosts(newPosts); else setPosts(prev => [...prev, ...newPosts]);
             setHasMore(newPosts.length === 5);
-        } catch (error) {
-            console.error("Lỗi tải bài viết");
-        } finally {
-            setLoading(false); 
-            setLoadingMore(false);
-        }
+        } catch (error) {} finally { setLoading(false); setLoadingMore(false); }
     };
 
-    // C. Khi chuyển sang trang của người khác -> Load lại từ Page 1
-    useEffect(() => {
-        setPage(1);
-        fetchUserPosts(1);
-    }, [id]);
+    useEffect(() => { setPage(1); fetchUserPosts(1); }, [id]);
 
-    // D. Lắng nghe sự kiện cuộn chuột
     useEffect(() => {
         const handleScroll = () => {
             if (window.innerHeight + document.documentElement.scrollTop >= document.documentElement.offsetHeight - 100) {
@@ -94,15 +63,7 @@ const Profile = () => {
         return () => window.removeEventListener('scroll', handleScroll);
     }, [hasMore, loading, loadingMore]);
 
-    // E. Khi biến page tăng lên -> Tự động gọi API tải thêm
-    useEffect(() => {
-        if (page > 1) fetchUserPosts(page);
-    }, [page]);
-
-
-    // =================================================================
-    // 2. CÁC HÀM XỬ LÝ (FOLLOW, XÓA BÀI, EDIT, ĐĂNG BÀI...)
-    // =================================================================
+    useEffect(() => { if (page > 1) fetchUserPosts(page); }, [page]);
 
     const handleToggleFollow = async () => {
         try {
@@ -113,11 +74,11 @@ const Profile = () => {
     };
 
     const handleDeletePost = async (postId) => {
-        if (!window.confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) return;
+        if (!window.confirm("Xóa bài viết này?")) return;
         try {
             await axiosClient.delete(`/posts/${postId}`);
             setPosts(posts.filter(p => p.id !== postId)); 
-        } catch (error) { alert(error.response?.data?.message || "Lỗi xóa bài"); }
+        } catch (error) { alert("Lỗi xóa bài"); }
     };
 
     const handleSaveProfile = async () => {
@@ -133,10 +94,9 @@ const Profile = () => {
     const handleAvatarUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const formData = new FormData();
-        formData.append('file', file);
+        const formData = new FormData(); formData.append('file', file);
         try {
-            const res = await axiosClient.post('/upload', formData);
+            const res = await axiosClient.post('/upload', formData); // Đã Fix Multipart
             setEditData({ ...editData, avatar_url: res.data.data.url });
         } catch (error) { alert("Lỗi upload ảnh"); }
     };
@@ -146,12 +106,12 @@ const Profile = () => {
         setSelectedFiles(prev => [...prev, ...files]);
         setPreviews(prev => [...prev, ...files.map(file => URL.createObjectURL(file))]);
     };
-    
     const removeFile = (i) => {
         setSelectedFiles(prev => prev.filter((_, index) => index !== i));
         setPreviews(prev => prev.filter((_, index) => index !== i));
     };
 
+    // ĐÃ FIX LỖI UPLOAD CỦA BẠN TẠI ĐÂY
     const handleCreatePost = async (e) => {
         e.preventDefault();
         if (!newPostContent.trim() && selectedFiles.length === 0) return;
@@ -160,16 +120,13 @@ const Profile = () => {
             let mediaUrls = [];
             for (let file of selectedFiles) {
                 const fd = new FormData(); fd.append('file', file);
-                const res = await axiosClient.post('/upload', fd);
+                const res = await axiosClient.post('/upload', fd); // Bỏ headers đi
                 mediaUrls.push(res.data.data.url);
             }
             await axiosClient.post('/posts', { content: newPostContent, media_urls: mediaUrls });
-            
-            // Đăng xong reset form và tải lại trang 1
             setNewPostContent(''); setSelectedFiles([]); setPreviews([]); 
-            setPage(1);
-            fetchUserPosts(1);
-        } catch (error) {} finally { setUploading(false); }
+            setPage(1); fetchUserPosts(1);
+        } catch (error) { alert("Lỗi tải bài");} finally { setUploading(false); }
     };
 
     const handleToggleLike = async (postId) => {
@@ -201,11 +158,6 @@ const Profile = () => {
         } catch (error) {}
     };
 
-
-    // =================================================================
-    // 3. RENDER GIAO DIỆN
-    // =================================================================
-
     if (loading && posts.length === 0 && !profile) return <div className="flex justify-center pt-20"><Loader2 className="animate-spin text-blue-500" size={32} /></div>;
     if (!profile) return <div className="text-center pt-20 text-red-500">Người dùng không tồn tại!</div>;
 
@@ -216,7 +168,6 @@ const Profile = () => {
 
     return (
         <div className="max-w-4xl mx-auto pb-10">
-            {/* Ảnh Bìa & Avatar */}
             <div className="bg-white shadow-sm rounded-b-xl overflow-hidden border border-gray-200 relative">
                 <div className="h-48 bg-gradient-to-r from-blue-400 to-indigo-500"></div>
                 <div className="px-8 pb-6 flex justify-between items-end relative -mt-16">
@@ -251,7 +202,6 @@ const Profile = () => {
                 </div>
             </div>
 
-            {/* MODAL SỬA THÔNG TIN */}
             {isEditing && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
                     <div className="bg-white p-6 rounded-2xl w-[400px] shadow-2xl relative">
@@ -280,9 +230,7 @@ const Profile = () => {
                 </div>
             )}
 
-            {/* DANH SÁCH BÀI VIẾT */}
             <div className="max-w-2xl mx-auto mt-6 space-y-6">
-                
                 {isMyProfile && (
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                         <div className="flex gap-3">
@@ -304,7 +252,7 @@ const Profile = () => {
                                         <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded-lg text-green-600 font-semibold transition"><ImageIcon size={20} /> Ảnh/Video</button>
                                         <input type="file" multiple accept="image/*,video/*" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
                                     </div>
-                                    <button type="submit" disabled={(!newPostContent.trim() && selectedFiles.length === 0) || uploading} className="bg-blue-600 text-white px-8 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50">{uploading ? 'Đang tải...' : 'Đăng bài'}</button>
+                                    <button type="submit" disabled={(!newPostContent.trim() && selectedFiles.length === 0) || uploading} className="bg-blue-600 text-white px-8 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition">{uploading ? 'Đang tải...' : 'Đăng bài'}</button>
                                 </div>
                             </form>
                         </div>
@@ -347,6 +295,7 @@ const Profile = () => {
                             <div className="flex justify-between items-center pt-2">
                                 <button onClick={() => handleToggleLike(post.id)} className={`flex-1 flex justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 transition ${post.is_liked ? 'text-red-500 font-medium' : 'text-gray-600'}`}><Heart size={20} className={post.is_liked ? 'fill-red-500' : ''} /> Thích</button>
                                 <button onClick={() => handleToggleComments(post.id)} className="flex-1 flex justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 text-gray-600"><MessageCircle size={20} /> Bình luận</button>
+                                <button className="flex-1 flex justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 text-gray-600"><Share2 size={20} /> Chia sẻ</button>
                             </div>
 
                             {activeCommentPostId === post.id && (
@@ -375,7 +324,6 @@ const Profile = () => {
                     ))
                 )}
 
-                {/* HIỂN THỊ SPINNER KHI ĐANG CUỘN LOAD THÊM */}
                 {loadingMore && <div className="flex justify-center py-4"><Loader2 className="animate-spin text-blue-500" size={32} /></div>}
                 {!hasMore && posts.length > 0 && <div className="text-center py-6 text-gray-400">Đã xem hết bài viết!</div>}
             </div>
