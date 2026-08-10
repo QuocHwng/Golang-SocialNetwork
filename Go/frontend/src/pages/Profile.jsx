@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axiosClient from '../services/api/axiosClient';
 import useAuthStore from '../store/useAuthStore';
-import { UserCircle, UserPlus, UserCheck, Heart, MessageCircle, Share2, Send, Image as ImageIcon, X, Trash2, Edit3, Camera } from 'lucide-react';
+import { UserCircle, UserPlus, UserCheck, Heart, MessageCircle, Share2, Send, Image as ImageIcon, X, Trash2, Edit3, Camera, Loader2 } from 'lucide-react';
 
 const Profile = () => {
     const { id } = useParams();
@@ -14,12 +14,19 @@ const Profile = () => {
 
     const isMyProfile = currentUser?.id === id;
 
+    // --- State cho Cuộn vô tận (Infinite Scroll) ---
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+
+    // --- State cho Đăng Bài ---
     const [newPostContent, setNewPostContent] = useState('');
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [previews, setPreviews] = useState([]);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef(null);
 
+    // --- State cho Bình luận ---
     const [activeCommentPostId, setActiveCommentPostId] = useState(null);
     const [comments, setComments] = useState({});
     const [newComment, setNewComment] = useState('');
@@ -29,20 +36,73 @@ const Profile = () => {
     const [editData, setEditData] = useState({ full_name: '', bio: '', avatar_url: '' });
     const avatarInputRef = useRef(null);
 
-    const fetchProfileData = async () => {
-        setLoading(true);
+    // =================================================================
+    // 1. LOGIC TẢI DỮ LIỆU & CUỘN VÔ TẬN
+    // =================================================================
+
+    // A. Chỉ tải thông tin Profile 1 lần khi đổi người
+    useEffect(() => {
+        axiosClient.get(`/users/${id}`)
+            .then(res => {
+                setProfile(res.data.data);
+                setEditData({ 
+                    full_name: res.data.data.full_name, 
+                    bio: res.data.data.bio || '', 
+                    avatar_url: res.data.data.avatar_url || '' 
+                });
+            })
+            .catch(err => console.error("Lỗi tải thông tin user"));
+    }, [id]);
+
+    // B. Hàm tải bài viết có phân trang
+    const fetchUserPosts = async (pageNum) => {
+        if (pageNum === 1) setLoading(true); 
+        else setLoadingMore(true);
+
         try {
-            const [profRes, postsRes] = await Promise.all([
-                axiosClient.get(`/users/${id}`),
-                axiosClient.get(`/users/${id}/posts`)
-            ]);
-            setProfile(profRes.data.data);
-            setEditData({ full_name: profRes.data.data.full_name, bio: profRes.data.data.bio || '', avatar_url: profRes.data.data.avatar_url || '' });
-            setPosts(postsRes.data.data || []);
-        } catch (error) { console.error("Lỗi tải trang"); } finally { setLoading(false); }
+            const res = await axiosClient.get(`/users/${id}/posts?page=${pageNum}&limit=5`);
+            const newPosts = res.data.data || [];
+            
+            if (pageNum === 1) {
+                setPosts(newPosts);
+            } else {
+                setPosts(prev => [...prev, ...newPosts]);
+            }
+            setHasMore(newPosts.length === 5);
+        } catch (error) {
+            console.error("Lỗi tải bài viết");
+        } finally {
+            setLoading(false); 
+            setLoadingMore(false);
+        }
     };
 
-    useEffect(() => { fetchProfileData(); }, [id]);
+    // C. Khi chuyển sang trang của người khác -> Load lại từ Page 1
+    useEffect(() => {
+        setPage(1);
+        fetchUserPosts(1);
+    }, [id]);
+
+    // D. Lắng nghe sự kiện cuộn chuột
+    useEffect(() => {
+        const handleScroll = () => {
+            if (window.innerHeight + document.documentElement.scrollTop >= document.documentElement.offsetHeight - 100) {
+                if (hasMore && !loading && !loadingMore) setPage(prev => prev + 1);
+            }
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, [hasMore, loading, loadingMore]);
+
+    // E. Khi biến page tăng lên -> Tự động gọi API tải thêm
+    useEffect(() => {
+        if (page > 1) fetchUserPosts(page);
+    }, [page]);
+
+
+    // =================================================================
+    // 2. CÁC HÀM XỬ LÝ (FOLLOW, XÓA BÀI, EDIT, ĐĂNG BÀI...)
+    // =================================================================
 
     const handleToggleFollow = async () => {
         try {
@@ -52,28 +112,24 @@ const Profile = () => {
         } catch (error) {}
     };
 
-    // --- XÓA BÀI VIẾT ---
     const handleDeletePost = async (postId) => {
         if (!window.confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) return;
         try {
             await axiosClient.delete(`/posts/${postId}`);
-            setPosts(posts.filter(p => p.id !== postId)); // Xóa khỏi màn hình
+            setPosts(posts.filter(p => p.id !== postId)); 
         } catch (error) { alert(error.response?.data?.message || "Lỗi xóa bài"); }
     };
 
-    // --- LƯU THÔNG TIN PROFILE ---
     const handleSaveProfile = async () => {
         try {
-            // Nếu chuỗi rỗng thì gửi null để backend gỡ ảnh
             const payload = { ...editData, avatar_url: editData.avatar_url || null };
             const res = await axiosClient.put('/profile', payload);
             setProfile({ ...profile, ...payload });
-            updateUser(res.data.data); // Cập nhật Navbar
+            updateUser(res.data.data); 
             setIsEditing(false);
         } catch (error) { alert("Lỗi lưu thông tin"); }
     };
 
-    // --- UPLOAD AVATAR MỚI ---
     const handleAvatarUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -85,18 +141,20 @@ const Profile = () => {
         } catch (error) { alert("Lỗi upload ảnh"); }
     };
 
-    // --- CODE ĐĂNG BÀI & BÌNH LUẬN GIỮ NGUYÊN ---
     const handleFileSelect = (e) => {
         const files = Array.from(e.target.files);
         setSelectedFiles(prev => [...prev, ...files]);
         setPreviews(prev => [...prev, ...files.map(file => URL.createObjectURL(file))]);
     };
+    
     const removeFile = (i) => {
         setSelectedFiles(prev => prev.filter((_, index) => index !== i));
         setPreviews(prev => prev.filter((_, index) => index !== i));
     };
+
     const handleCreatePost = async (e) => {
         e.preventDefault();
+        if (!newPostContent.trim() && selectedFiles.length === 0) return;
         setUploading(true);
         try {
             let mediaUrls = [];
@@ -106,7 +164,11 @@ const Profile = () => {
                 mediaUrls.push(res.data.data.url);
             }
             await axiosClient.post('/posts', { content: newPostContent, media_urls: mediaUrls });
-            setNewPostContent(''); setSelectedFiles([]); setPreviews([]); fetchProfileData();
+            
+            // Đăng xong reset form và tải lại trang 1
+            setNewPostContent(''); setSelectedFiles([]); setPreviews([]); 
+            setPage(1);
+            fetchUserPosts(1);
         } catch (error) {} finally { setUploading(false); }
     };
 
@@ -129,6 +191,7 @@ const Profile = () => {
 
     const handleSendComment = async (e, postId) => {
         e.preventDefault();
+        if (!newComment.trim()) return;
         try {
             const res = await axiosClient.post(`/posts/${postId}/comments`, { content: newComment });
             const added = { ...res.data.data, author: { full_name: currentUser.full_name, avatar_url: currentUser.avatar_url } };
@@ -138,10 +201,14 @@ const Profile = () => {
         } catch (error) {}
     };
 
-    if (loading) return <div className="text-center pt-20 text-gray-500">Đang tải...</div>;
+
+    // =================================================================
+    // 3. RENDER GIAO DIỆN
+    // =================================================================
+
+    if (loading && posts.length === 0 && !profile) return <div className="flex justify-center pt-20"><Loader2 className="animate-spin text-blue-500" size={32} /></div>;
     if (!profile) return <div className="text-center pt-20 text-red-500">Người dùng không tồn tại!</div>;
 
-    // Component Ảnh đại diện (Dùng chung)
     const AvatarDisplay = ({ url, sizeClass }) => (
         url ? <img src={url} alt="avatar" className={`${sizeClass} object-cover rounded-full border bg-white`} /> 
             : <UserCircle className={`${sizeClass} text-gray-300 bg-white rounded-full`} />
@@ -154,26 +221,15 @@ const Profile = () => {
                 <div className="h-48 bg-gradient-to-r from-blue-400 to-indigo-500"></div>
                 <div className="px-8 pb-6 flex justify-between items-end relative -mt-16">
                     <div className="flex items-end gap-4">
-                        
-                        {/* ==================================================== */}
-                        {/* AVATAR TÍCH HỢP NÚT SỬA BÊN TRONG */}
-                        {/* ==================================================== */}
                         <div className="bg-white p-1 rounded-full shadow-md relative group">
                             <AvatarDisplay url={profile.avatar_url} sizeClass="w-32 h-32" />
-                            
-                            {/* Lớp phủ (Overlay) hiện lên khi rê chuột vào - Chỉ hiện nếu là tường nhà mình */}
                             {isMyProfile && (
-                                <div 
-                                    onClick={() => setIsEditing(true)}
-                                    className="absolute top-1 left-1 w-32 h-32 bg-black/50 rounded-full flex flex-col justify-center items-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                    title="Chỉnh sửa hồ sơ"
-                                >
+                                <div onClick={() => setIsEditing(true)} className="absolute top-1 left-1 w-32 h-32 bg-black/50 rounded-full flex flex-col justify-center items-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                     <Camera size={32} className="text-white mb-1" />
                                     <span className="text-white text-[10px] font-bold uppercase tracking-wider">Sửa hồ sơ</span>
                                 </div>
                             )}
                         </div>
-
                         <div className="mb-2">
                             <h1 className="text-3xl font-bold text-gray-900">{profile.full_name}</h1>
                             <p className="text-gray-500 font-medium">@{profile.username}</p>
@@ -181,16 +237,9 @@ const Profile = () => {
                         </div>
                     </div>
 
-                    {/* Nút Follow (Ẩn nếu là tường nhà mình, nút Sửa riêng đã bị gỡ bỏ) */}
                     {!isMyProfile && (
-                        <button 
-                            onClick={handleToggleFollow} 
-                            className={`mb-4 flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition shadow-sm ${
-                                profile.is_following ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' : 'bg-blue-600 text-white hover:bg-blue-700'
-                            }`}
-                        >
-                            {profile.is_following ? <UserCheck size={20} /> : <UserPlus size={20} />}
-                            {profile.is_following ? 'Đang theo dõi' : 'Theo dõi'}
+                        <button onClick={handleToggleFollow} className={`mb-4 flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition shadow-sm ${profile.is_following ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                            {profile.is_following ? <UserCheck size={20} /> : <UserPlus size={20} />} {profile.is_following ? 'Đang theo dõi' : 'Theo dõi'}
                         </button>
                     )}
                 </div>
@@ -198,7 +247,7 @@ const Profile = () => {
                 <div className="px-8 py-4 border-t flex gap-8 text-gray-600 bg-gray-50">
                     <div><strong className="text-gray-900">{profile.followers_count}</strong> Người theo dõi</div>
                     <div><strong className="text-gray-900">{profile.following_count}</strong> Đang theo dõi</div>
-                    <div><strong className="text-gray-900">{posts.length}</strong> Bài viết</div>
+                    <div><strong className="text-gray-900">{posts.length}</strong> Bài viết (trên màn hình)</div>
                 </div>
             </div>
 
@@ -208,18 +257,14 @@ const Profile = () => {
                     <div className="bg-white p-6 rounded-2xl w-[400px] shadow-2xl relative">
                         <button onClick={() => setIsEditing(false)} className="absolute top-4 right-4 text-gray-400 hover:text-black"><X size={24} /></button>
                         <h2 className="text-xl font-bold mb-4">Chỉnh sửa thông tin</h2>
-                        
                         <div className="flex flex-col items-center gap-3 mb-6">
                             <div className="relative group">
                                 <AvatarDisplay url={editData.avatar_url} sizeClass="w-24 h-24" />
-                                <button onClick={() => avatarInputRef.current?.click()} className="absolute inset-0 bg-black/40 text-white flex justify-center items-center rounded-full opacity-0 group-hover:opacity-100 transition">
-                                    <Camera size={24} />
-                                </button>
+                                <button onClick={() => avatarInputRef.current?.click()} className="absolute inset-0 bg-black/40 text-white flex justify-center items-center rounded-full opacity-0 group-hover:opacity-100 transition"><Camera size={24} /></button>
                                 <input type="file" ref={avatarInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
                             </div>
                             <button onClick={() => setEditData({...editData, avatar_url: ''})} className="text-sm text-red-500 hover:underline">Gỡ ảnh hiện tại</button>
                         </div>
-
                         <div className="space-y-4">
                             <div>
                                 <label className="text-sm font-bold text-gray-700">Họ và Tên</label>
@@ -235,7 +280,7 @@ const Profile = () => {
                 </div>
             )}
 
-            {/* Danh sách bài viết */}
+            {/* DANH SÁCH BÀI VIẾT */}
             <div className="max-w-2xl mx-auto mt-6 space-y-6">
                 
                 {isMyProfile && (
@@ -244,13 +289,12 @@ const Profile = () => {
                             <AvatarDisplay url={currentUser?.avatar_url} sizeClass="w-10 h-10 shrink-0" />
                             <form onSubmit={handleCreatePost} className="flex-1">
                                 <textarea value={newPostContent} onChange={(e) => setNewPostContent(e.target.value)} placeholder="Bạn đang nghĩ gì thế?" className="w-full bg-gray-100 rounded-xl p-3 outline-none resize-none" rows="2"></textarea>
-                                {/* Preview Ảnh */}
                                 {previews.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mt-3 p-2 bg-gray-50 rounded-lg border">
                                         {previews.map((preview, index) => (
                                             <div key={index} className="relative w-24 h-24 group">
-                                                <img src={preview} alt="preview" className="w-full h-full object-cover rounded-lg shadow-sm" />
-                                                <button type="button" onClick={() => removeFile(index)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100"><X size={14} /></button>
+                                                {selectedFiles[index].type.startsWith('video') ? <video src={preview} className="w-full h-full object-cover rounded-lg" /> : <img src={preview} alt="preview" className="w-full h-full object-cover rounded-lg shadow-sm" />}
+                                                <button type="button" onClick={() => removeFile(index)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition shadow"><X size={14} /></button>
                                             </div>
                                         ))}
                                     </div>
@@ -282,11 +326,8 @@ const Profile = () => {
                                         <p className="text-xs text-gray-500">{new Date(post.created_at).toLocaleString('vi-VN')}</p>
                                     </div>
                                 </div>
-                                {/* NÚT XÓA BÀI (Chỉ hiện nếu là bài của mình) */}
                                 {isMyProfile && (
-                                    <button onClick={() => handleDeletePost(post.id)} className="text-gray-400 hover:text-red-500 transition p-1" title="Xóa bài viết">
-                                        <Trash2 size={20} />
-                                    </button>
+                                    <button onClick={() => handleDeletePost(post.id)} className="text-gray-400 hover:text-red-500 transition p-1" title="Xóa bài viết"><Trash2 size={20} /></button>
                                 )}
                             </div>
                             
@@ -294,7 +335,7 @@ const Profile = () => {
 
                             {post.media && post.media.length > 0 && (
                                 <div className={`grid gap-2 mt-3 ${post.media.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                                    {post.media.map(m => ( m.media_type === 'video' ? <video key={m.id} controls className="w-full h-auto rounded-lg max-h-[500px] object-cover bg-black"><source src={m.media_url} /></video> : <img key={m.id} src={m.media_url} alt="media" className="w-full h-auto rounded-lg max-h-[500px] object-cover border" /> ))}
+                                    {post.media.map(m => ( m.media_type === 'video' ? <video key={m.id} controls className="w-full rounded-lg max-h-[500px] object-cover bg-black"><source src={m.media_url} /></video> : <img key={m.id} src={m.media_url} alt="media" className="w-full rounded-lg max-h-[500px] object-cover border" /> ))}
                                 </div>
                             )}
 
@@ -308,7 +349,6 @@ const Profile = () => {
                                 <button onClick={() => handleToggleComments(post.id)} className="flex-1 flex justify-center gap-2 py-2 rounded-lg hover:bg-gray-50 text-gray-600"><MessageCircle size={20} /> Bình luận</button>
                             </div>
 
-                            {/* Khung bình luận */}
                             {activeCommentPostId === post.id && (
                                 <div className="mt-4 border-t pt-4">
                                     <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-2">
@@ -326,7 +366,7 @@ const Profile = () => {
                                         <AvatarDisplay url={currentUser?.avatar_url} sizeClass="w-9 h-9 shrink-0" />
                                         <div className="flex-1 relative">
                                             <input type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Viết bình luận..." className="w-full bg-gray-100 border-none rounded-full py-2 pl-4 pr-10 outline-none focus:ring-2 focus:ring-blue-200" />
-                                            <button type="submit" disabled={!newComment.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-500 hover:text-blue-700 disabled:text-gray-300"><Send size={18} /></button>
+                                            <button type="submit" disabled={!newComment.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-500"><Send size={18} /></button>
                                         </div>
                                     </form>
                                 </div>
@@ -334,6 +374,10 @@ const Profile = () => {
                         </div>
                     ))
                 )}
+
+                {/* HIỂN THỊ SPINNER KHI ĐANG CUỘN LOAD THÊM */}
+                {loadingMore && <div className="flex justify-center py-4"><Loader2 className="animate-spin text-blue-500" size={32} /></div>}
+                {!hasMore && posts.length > 0 && <div className="text-center py-6 text-gray-400">Đã xem hết bài viết!</div>}
             </div>
         </div>
     );
