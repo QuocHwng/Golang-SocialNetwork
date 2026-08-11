@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import axiosClient from '../services/api/axiosClient';
 import useAuthStore from '../store/useAuthStore';
-import { UserCircle, UserPlus, UserCheck, Heart, MessageCircle, Share2, Send, Image as ImageIcon, X, Trash2, Edit3, Camera, Loader2 } from 'lucide-react';
+import { UserCircle, UserPlus, UserCheck, Heart, MessageCircle, Share2, Send, Image as ImageIcon, X, Trash2, Edit3, Camera, Loader2, MessageSquare } from 'lucide-react';
 
 const Profile = () => {
     const { id } = useParams();
     const { user: currentUser, updateUser } = useAuthStore();
+    const navigate = useNavigate();
     
     const [profile, setProfile] = useState(null);
     const [posts, setPosts] = useState([]);
@@ -14,20 +15,24 @@ const Profile = () => {
 
     const isMyProfile = currentUser?.id === id;
 
+    // --- State cho Cuộn vô tận ---
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
 
+    // --- State cho Đăng Bài ---
     const [newPostContent, setNewPostContent] = useState('');
     const [selectedFiles, setSelectedFiles] = useState([]);
     const [previews, setPreviews] = useState([]);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef(null);
 
+    // --- State cho Bình luận ---
     const [activeCommentPostId, setActiveCommentPostId] = useState(null);
     const [comments, setComments] = useState({});
     const [newComment, setNewComment] = useState('');
 
+    // --- State cho Edit Profile ---
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({ full_name: '', bio: '', avatar_url: '' });
     const avatarInputRef = useRef(null);
@@ -36,22 +41,33 @@ const Profile = () => {
         axiosClient.get(`/users/${id}`)
             .then(res => {
                 setProfile(res.data.data);
-                setEditData({ full_name: res.data.data.full_name, bio: res.data.data.bio || '', avatar_url: res.data.data.avatar_url || '' });
+                setEditData({ 
+                    full_name: res.data.data.full_name, 
+                    bio: res.data.data.bio || '', 
+                    avatar_url: res.data.data.avatar_url || '' 
+                });
             })
-            .catch(err => console.error(err));
+            .catch(err => console.error("Lỗi tải thông tin user"));
     }, [id]);
 
     const fetchUserPosts = async (pageNum) => {
-        if (pageNum === 1) setLoading(true); else setLoadingMore(true);
+        if (pageNum === 1) setLoading(true); 
+        else setLoadingMore(true);
+
         try {
             const res = await axiosClient.get(`/users/${id}/posts?page=${pageNum}&limit=5`);
             const newPosts = res.data.data || [];
-            if (pageNum === 1) setPosts(newPosts); else setPosts(prev => [...prev, ...newPosts]);
+            if (pageNum === 1) setPosts(newPosts);
+            else setPosts(prev => [...prev, ...newPosts]);
             setHasMore(newPosts.length === 5);
-        } catch (error) {} finally { setLoading(false); setLoadingMore(false); }
+        } catch (error) { console.error("Lỗi tải bài viết"); } 
+        finally { setLoading(false); setLoadingMore(false); }
     };
 
-    useEffect(() => { setPage(1); fetchUserPosts(1); }, [id]);
+    useEffect(() => {
+        setPage(1);
+        fetchUserPosts(1);
+    }, [id]);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -74,11 +90,11 @@ const Profile = () => {
     };
 
     const handleDeletePost = async (postId) => {
-        if (!window.confirm("Xóa bài viết này?")) return;
+        if (!window.confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) return;
         try {
             await axiosClient.delete(`/posts/${postId}`);
             setPosts(posts.filter(p => p.id !== postId)); 
-        } catch (error) { alert("Lỗi xóa bài"); }
+        } catch (error) { alert(error.response?.data?.message || "Lỗi xóa bài"); }
     };
 
     const handleSaveProfile = async () => {
@@ -94,9 +110,11 @@ const Profile = () => {
     const handleAvatarUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        const formData = new FormData(); formData.append('file', file);
+        const formData = new FormData();
+        formData.append('file', file);
         try {
-            const res = await axiosClient.post('/upload', formData); // Đã Fix Multipart
+            // Không set header multipart/form-data để tránh lỗi boundary
+            const res = await axiosClient.post('/upload', formData);
             setEditData({ ...editData, avatar_url: res.data.data.url });
         } catch (error) { alert("Lỗi upload ảnh"); }
     };
@@ -106,12 +124,12 @@ const Profile = () => {
         setSelectedFiles(prev => [...prev, ...files]);
         setPreviews(prev => [...prev, ...files.map(file => URL.createObjectURL(file))]);
     };
+    
     const removeFile = (i) => {
         setSelectedFiles(prev => prev.filter((_, index) => index !== i));
         setPreviews(prev => prev.filter((_, index) => index !== i));
     };
 
-    // ĐÃ FIX LỖI UPLOAD CỦA BẠN TẠI ĐÂY
     const handleCreatePost = async (e) => {
         e.preventDefault();
         if (!newPostContent.trim() && selectedFiles.length === 0) return;
@@ -120,13 +138,14 @@ const Profile = () => {
             let mediaUrls = [];
             for (let file of selectedFiles) {
                 const fd = new FormData(); fd.append('file', file);
-                const res = await axiosClient.post('/upload', fd); // Bỏ headers đi
+                const res = await axiosClient.post('/upload', fd);
                 mediaUrls.push(res.data.data.url);
             }
             await axiosClient.post('/posts', { content: newPostContent, media_urls: mediaUrls });
+            
             setNewPostContent(''); setSelectedFiles([]); setPreviews([]); 
             setPage(1); fetchUserPosts(1);
-        } catch (error) { alert("Lỗi tải bài");} finally { setUploading(false); }
+        } catch (error) {} finally { setUploading(false); }
     };
 
     const handleToggleLike = async (postId) => {
@@ -162,12 +181,13 @@ const Profile = () => {
     if (!profile) return <div className="text-center pt-20 text-red-500">Người dùng không tồn tại!</div>;
 
     const AvatarDisplay = ({ url, sizeClass }) => (
-        url ? <img src={url} alt="avatar" className={`${sizeClass} object-cover rounded-full border bg-white`} /> 
-            : <UserCircle className={`${sizeClass} text-gray-300 bg-white rounded-full`} />
+        url ? <img src={url} alt="avatar" className={`${sizeClass} object-cover rounded-full border bg-white shrink-0`} /> 
+            : <UserCircle className={`${sizeClass} text-gray-300 bg-white rounded-full shrink-0`} />
     );
 
     return (
         <div className="max-w-4xl mx-auto pb-10">
+            {/* Ảnh Bìa & Avatar */}
             <div className="bg-white shadow-sm rounded-b-xl overflow-hidden border border-gray-200 relative">
                 <div className="h-48 bg-gradient-to-r from-blue-400 to-indigo-500"></div>
                 <div className="px-8 pb-6 flex justify-between items-end relative -mt-16">
@@ -188,10 +208,22 @@ const Profile = () => {
                         </div>
                     </div>
 
+                    {/* CÁC NÚT HÀNH ĐỘNG CỦA TRANG CÁ NHÂN */}
                     {!isMyProfile && (
-                        <button onClick={handleToggleFollow} className={`mb-4 flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition shadow-sm ${profile.is_following ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                            {profile.is_following ? <UserCheck size={20} /> : <UserPlus size={20} />} {profile.is_following ? 'Đang theo dõi' : 'Theo dõi'}
-                        </button>
+                        <div className="flex gap-2 mb-4">
+                            {/* Nút Nhắn tin (Chuyển hướng sang trang Chat kèm theo thông tin người nhận) */}
+                            <button 
+                                onClick={() => navigate('/chat', { state: { contact: profile } })}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold transition shadow-sm bg-gray-100 hover:bg-gray-200 text-gray-800"
+                            >
+                                <MessageSquare size={20} /> Nhắn tin
+                            </button>
+
+                            {/* Nút Theo dõi */}
+                            <button onClick={handleToggleFollow} className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition shadow-sm ${profile.is_following ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                                {profile.is_following ? <UserCheck size={20} /> : <UserPlus size={20} />} {profile.is_following ? 'Đang theo dõi' : 'Theo dõi'}
+                            </button>
+                        </div>
                     )}
                 </div>
                 
@@ -202,6 +234,7 @@ const Profile = () => {
                 </div>
             </div>
 
+            {/* MODAL SỬA THÔNG TIN */}
             {isEditing && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
                     <div className="bg-white p-6 rounded-2xl w-[400px] shadow-2xl relative">
@@ -230,7 +263,9 @@ const Profile = () => {
                 </div>
             )}
 
+            {/* DANH SÁCH BÀI VIẾT */}
             <div className="max-w-2xl mx-auto mt-6 space-y-6">
+                
                 {isMyProfile && (
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                         <div className="flex gap-3">
@@ -287,6 +322,17 @@ const Profile = () => {
                                 </div>
                             )}
 
+                            {/* Share Post */}
+                            {post.shared_post && (
+                                <div className="mt-3 p-3 border rounded-xl bg-gray-50">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <AvatarDisplay url={post.shared_post.author.avatar_url} sizeClass="w-6 h-6" />
+                                        <span className="font-semibold text-sm">{post.shared_post.author.full_name}</span>
+                                    </div>
+                                    <p className="text-sm text-gray-700">{post.shared_post.content}</p>
+                                </div>
+                            )}
+
                             <div className="flex justify-between items-center text-gray-500 text-sm mt-4 border-b pb-2">
                                 <span>{post.likes_count} lượt thích</span>
                                 <span className="cursor-pointer hover:underline" onClick={() => handleToggleComments(post.id)}>{post.comments_count} bình luận</span>
@@ -315,7 +361,7 @@ const Profile = () => {
                                         <AvatarDisplay url={currentUser?.avatar_url} sizeClass="w-9 h-9 shrink-0" />
                                         <div className="flex-1 relative">
                                             <input type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Viết bình luận..." className="w-full bg-gray-100 border-none rounded-full py-2 pl-4 pr-10 outline-none focus:ring-2 focus:ring-blue-200" />
-                                            <button type="submit" disabled={!newComment.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-500"><Send size={18} /></button>
+                                            <button type="submit" disabled={!newComment.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-500 hover:text-blue-700 disabled:text-gray-300"><Send size={18} /></button>
                                         </div>
                                     </form>
                                 </div>
