@@ -2,6 +2,7 @@ package server
 
 import (
 	"social-network/internal/middleware"
+	"social-network/internal/module/chat"
 	"social-network/internal/module/interaction"
 	"social-network/internal/module/notification"
 	"social-network/internal/module/post"
@@ -41,6 +42,10 @@ func SetupRouter() *gin.Engine {
 	notificationRepo := notification.NewNotificationRepository(database.DB)
 	notificationService := notification.NewNotificationService(notificationRepo)
 	notificationHandler := notification.NewNotificationHandler(notificationService)
+
+	chatRepo := chat.NewChatRepository(database.DB)
+	chatService := chat.NewChatService(chatRepo, userRepo)
+	chatHandler := chat.NewChatHandler(chatService)
 
 	// 2. KHAI BÁO CÁC ĐƯỜNG DẪN API (ROUTES)
 	v1 := r.Group("/api/v1")
@@ -85,6 +90,13 @@ func SetupRouter() *gin.Engine {
 
 		protected.PUT("/comments/:id", interactionHandler.UpdateComment)    // <-- THÊM DÒNG NÀY (Sửa cmt)
 		protected.DELETE("/comments/:id", interactionHandler.DeleteComment) // <-- THÊM DÒNG NÀY (Xóa cmt)
+
+		//chat
+		protected.GET("/chat/contacts", chatHandler.GetContacts)
+		protected.GET("/chat/:id", chatHandler.GetMessages)
+		protected.POST("/chat/:id", chatHandler.SendMessage)
+		protected.DELETE("/chat/messages/:msgId", chatHandler.RecallMessage) // Thu hồi
+		protected.POST("/chat/:id/typing", chatHandler.SendTyping)           //đang type
 
 	}
 

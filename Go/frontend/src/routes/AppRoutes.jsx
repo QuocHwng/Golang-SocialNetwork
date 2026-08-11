@@ -8,6 +8,8 @@ import PostDetail from '../pages/PostDetail';
 import MainLayout from '../layouts/MainLayout';
 import useAuthStore from '../store/useAuthStore';
 
+import Chat from '../pages/Chat';
+
 const AppRoutes = () => {
     const isAuthenticated = useAuthStore(state => state.isAuthenticated);
 
@@ -22,6 +24,7 @@ const AppRoutes = () => {
                 <Route path="/" element={<Home />} />
                 <Route path="/profile/:id" element={<Profile />} />
                 <Route path="/post/:id" element={<PostDetail />} />
+                <Route path="/chat" element={<Chat />} />
             </Route>
         </Routes>
     );
