@@ -40,6 +40,13 @@ type Post struct {
 	UpdatedAt     time.Time
 }
 
+// SavedPost đại diện cho bài viết được lưu (bookmark)
+type SavedPost struct {
+	UserID    string    `gorm:"type:uuid;primaryKey"`
+	PostID    string    `gorm:"type:uuid;primaryKey"`
+	CreatedAt time.Time
+}
+
 type PostRepository interface {
 	CreatePost(post *Post) error
 	CreatePostMedia(media *PostMedia) error
@@ -51,14 +58,16 @@ type PostRepository interface {
 	UpdatePost(postID string, userID string, content string) error
 	GetGroupPosts(groupID string, limit int, offset int) ([]Post, error)
 	CheckGroupMember(groupID string, userID string) bool
+
+	// Features mới: Bookmark bài viết
+	ToggleSavePost(userID, postID string) (bool, error)
+	GetSavedPosts(userID string, limit int, offset int) ([]Post, error)
 }
 
 type postRepo struct{ db *gorm.DB }
 
-// NewPostRepository khởi tạo repository cho Post.
-// Lưu ý: KHÔNG dùng AutoMigrate ở đây. Hãy chạy migration bằng golang-migrate:
-//   migrate -path ./migrations -database "postgres://..." up
 func NewPostRepository(db *gorm.DB) PostRepository {
+	db.AutoMigrate(&SavedPost{}) // Tự động tạo bảng saved_posts
 	return &postRepo{db: db}
 }
 
@@ -136,4 +145,37 @@ func (r *postRepo) CheckGroupMember(groupID string, userID string) bool {
 		Where("group_id = ? AND user_id = ? AND status = 'approved'", groupID, userID).
 		Count(&count)
 	return count > 0
+}
+
+func (r *postRepo) ToggleSavePost(userID, postID string) (bool, error) {
+	var saved SavedPost
+	err := r.db.Where("user_id = ? AND post_id = ?", userID, postID).First(&saved).Error
+
+	if err == nil {
+		// Đã lưu -> Bỏ lưu
+		if err := r.db.Delete(&saved).Error; err != nil {
+			return false, err
+		}
+		return false, nil
+	} else if err == gorm.ErrRecordNotFound {
+		// Chưa lưu -> Lưu bài
+		newSaved := SavedPost{UserID: userID, PostID: postID}
+		if err := r.db.Create(&newSaved).Error; err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	return false, err
+}
+
+func (r *postRepo) GetSavedPosts(userID string, limit int, offset int) ([]Post, error) {
+	var posts []Post
+	err := r.db.
+		Joins("JOIN saved_posts ON saved_posts.post_id = posts.id").
+		Preload("Author").Preload("Media").
+		Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").
+		Where("saved_posts.user_id = ?", userID).
+		Order("saved_posts.created_at desc").
+		Limit(limit).Offset(offset).Find(&posts).Error
+	return posts, err
 }

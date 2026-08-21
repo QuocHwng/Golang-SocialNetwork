@@ -13,6 +13,10 @@ type PostService interface {
 	DeletePost(postID string, userID string) error
 	UpdatePost(postID string, userID string, content string) error
 	GetGroupPosts(groupID string, userID string, limit int, page int) ([]FeedPostResponse, error) // Đã thêm userID
+	
+	// Features mới: Bookmark bài viết
+	ToggleSavePost(userID, postID string) (bool, error)
+	GetSavedPosts(userID string, limit int, page int) ([]FeedPostResponse, error)
 }
 
 type postService struct{ repo PostRepository }
@@ -121,6 +125,34 @@ func (s *postService) GetGroupPosts(groupID string, userID string, limit int, pa
 	posts, err := s.repo.GetGroupPosts(groupID, limit, offset)
 	if err != nil {
 		return nil, errors.New("lỗi tải bài viết nhóm")
+	}
+
+	var result []FeedPostResponse
+	for _, p := range posts {
+		result = append(result, mapPostToResponse(p))
+	}
+	return result, nil
+}
+
+func (s *postService) ToggleSavePost(userID, postID string) (bool, error) {
+	// Kiểm tra xem bài viết có tồn tại không
+	_, err := s.repo.GetPostByID(postID)
+	if err != nil {
+		return false, errors.New("bài viết không tồn tại")
+	}
+	
+	isSaved, err := s.repo.ToggleSavePost(userID, postID)
+	if err != nil {
+		return false, errors.New("lỗi lưu bài viết")
+	}
+	return isSaved, nil
+}
+
+func (s *postService) GetSavedPosts(userID string, limit int, page int) ([]FeedPostResponse, error) {
+	offset := (page - 1) * limit
+	posts, err := s.repo.GetSavedPosts(userID, limit, offset)
+	if err != nil {
+		return nil, errors.New("lỗi tải danh sách bài đã lưu")
 	}
 
 	var result []FeedPostResponse
