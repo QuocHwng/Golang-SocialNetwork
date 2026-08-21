@@ -15,19 +15,15 @@ const Chat = () => {
     const messagesEndRef = useRef(null); 
     const fileInputRef = useRef(null);
 
-    // --- State cho Tính năng Nâng cao ---
     const [isTyping, setIsTyping] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
-    const [openMenuMsgId, setOpenMenuMsgId] = useState(null); // Menu thu hồi tin nhắn
+    const [openMenuMsgId, setOpenMenuMsgId] = useState(null);
     let typingTimeoutRef = useRef(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
+    const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); };
 
     useEffect(() => { scrollToBottom(); }, [messages, isTyping]);
 
-    // Tắt menu khi click ra ngoài
     useEffect(() => {
         const handleClickOutside = () => setOpenMenuMsgId(null);
         window.addEventListener('click', handleClickOutside);
@@ -46,7 +42,7 @@ const Chat = () => {
                 setActiveContact(newContact);
             }
             setContacts(loadedContacts);
-        } catch (error) { console.error("Lỗi tải danh sách chat"); }
+        } catch (error) {}
     };
 
     useEffect(() => { fetchContacts(); }, []);
@@ -57,18 +53,17 @@ const Chat = () => {
             try {
                 const res = await axiosClient.get(`/chat/${activeContact.id}`);
                 setMessages(res.data.data || []);
-            } catch (error) { console.error("Lỗi tải tin nhắn"); }
+            } catch (error) {}
         };
         fetchMessages();
     }, [activeContact]);
 
-    // LẮNG NGHE CÁC SỰ KIỆN WEBSOCKET TỪ MAIN LAYOUT
     useEffect(() => {
         const handleRealtimeMessage = (e) => {
             const msg = e.detail;
             if (activeContact && (msg.sender_id === activeContact.id || msg.receiver_id === activeContact.id)) {
                 setMessages(prev => [...prev, msg]);
-                setIsTyping(false); // Có tin nhắn tới thì tắt hiệu ứng typing
+                setIsTyping(false); 
             } else { fetchContacts(); }
         };
 
@@ -82,7 +77,7 @@ const Chat = () => {
             if (activeContact && senderId === activeContact.id) {
                 setIsTyping(true);
                 clearTimeout(typingTimeoutRef.current);
-                typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000); // Tự tắt sau 3s nếu ngừng gõ
+                typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000); 
             }
         };
 
@@ -97,15 +92,11 @@ const Chat = () => {
         };
     }, [activeContact]);
 
-    // BÁO HIỆU MÌNH ĐANG GÕ CHỮ
     const handleTyping = (e) => {
         setNewMessage(e.target.value);
-        if (activeContact) {
-            axiosClient.post(`/chat/${activeContact.id}/typing`).catch(() => {});
-        }
+        if (activeContact) { axiosClient.post(`/chat/${activeContact.id}/typing`).catch(() => {}); }
     };
 
-    // GỬI TIN NHẮN (CHỮ)
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!newMessage.trim() || !activeContact) return;
@@ -114,69 +105,55 @@ const Chat = () => {
             setMessages(prev => [...prev, res.data.data]);
             setNewMessage('');
             if (!contacts.find(c => c.id === activeContact.id)) fetchContacts();
-        } catch (error) { alert("Lỗi gửi tin nhắn"); }
+        } catch (error) {}
     };
 
-    // GỬI TIN NHẮN (ẢNH)
     const handleSendImage = async (e) => {
         const file = e.target.files[0];
         if (!file || !activeContact) return;
-        
         setUploadingImage(true);
         try {
-            // 1. Up ảnh lên Cloudinary
-            const fd = new FormData();
-            fd.append('file', file);
+            const fd = new FormData(); fd.append('file', file);
             const uploadRes = await axiosClient.post('/upload', fd);
             const imageUrl = uploadRes.data.data.url;
-
-            // 2. Gửi tin nhắn chứa link ảnh
             const res = await axiosClient.post(`/chat/${activeContact.id}`, { content: '', image_url: imageUrl });
             setMessages(prev => [...prev, res.data.data]);
             if (!contacts.find(c => c.id === activeContact.id)) fetchContacts();
         } catch (error) { alert("Lỗi gửi ảnh"); } 
-        finally { 
-            setUploadingImage(false);
-            e.target.value = null; // Reset input file
-        }
+        finally { setUploadingImage(false); e.target.value = null; }
     };
 
-    // THU HỒI TIN NHẮN
     const handleRecallMessage = async (msgId) => {
-        if (!window.confirm("Bạn có chắc muốn thu hồi tin nhắn này?")) return;
+        if (!window.confirm("Thu hồi tin nhắn này?")) return;
         try {
             await axiosClient.delete(`/chat/messages/${msgId}?receiver_id=${activeContact.id}`);
             setMessages(prev => prev.filter(m => m.id !== msgId));
-        } catch (error) { alert(error.response?.data?.message || "Lỗi thu hồi tin nhắn"); }
+        } catch (error) {}
     };
 
     const AvatarDisplay = ({ url, sizeClass }) => (
-        url ? <img src={url} alt="ava" className={`${sizeClass} object-cover rounded-full border bg-white shrink-0`} /> 
-            : <UserCircle className={`${sizeClass} text-gray-300 bg-white rounded-full shrink-0`} />
+        url ? <img src={url} alt="ava" className={`${sizeClass} object-cover rounded-full border border-stone-200 dark:border-stone-700 bg-white shrink-0`} /> 
+            : <UserCircle className={`${sizeClass} text-stone-300 bg-white rounded-full shrink-0`} />
     );
 
     return (
-        <div className="max-w-5xl mx-auto mt-4 px-4 h-[calc(100vh-100px)]">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 flex h-full overflow-hidden">
+        <div className="max-w-6xl mx-auto mt-4 px-4 h-[calc(100vh-100px)] pb-4">
+            <div className="bg-white dark:bg-stone-800 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none border border-stone-100 dark:border-stone-700 flex h-full overflow-hidden transition-colors">
                 
-                {/* CỘT TRÁI: DANH SÁCH LIÊN HỆ */}
-                <div className="w-1/3 border-r flex flex-col bg-gray-50">
-                    <div className="p-4 border-b bg-white">
-                        <h2 className="text-xl font-bold text-gray-800">Đoạn chat</h2>
+                {/* CỘT TRÁI: DANH SÁCH */}
+                <div className="w-1/3 border-r border-stone-100 dark:border-stone-700 flex flex-col bg-stone-50/50 dark:bg-stone-800/50">
+                    <div className="p-5 border-b border-stone-100 dark:border-stone-700 bg-white/50 dark:bg-stone-800/80 backdrop-blur-sm">
+                        <h2 className="text-xl font-black text-stone-900 dark:text-white">Tin nhắn</h2>
                     </div>
-                    <div className="flex-1 overflow-y-auto">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
                         {contacts.length === 0 ? (
-                            <p className="text-center text-gray-400 mt-10 text-sm p-4">Chưa có cuộc trò chuyện nào.</p>
+                            <p className="text-center text-stone-400 mt-10 text-sm p-4">Bạn chưa chat với ai.</p>
                         ) : (
                             contacts.map(contact => (
-                                <div 
-                                    key={contact.id} 
-                                    onClick={() => setActiveContact(contact)}
-                                    className={`flex items-center gap-3 p-4 cursor-pointer transition border-b border-gray-100 ${activeContact?.id === contact.id ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
-                                >
+                                <div key={contact.id} onClick={() => setActiveContact(contact)} className={`flex items-center gap-4 p-4 cursor-pointer transition border-b border-stone-100 dark:border-stone-700/50 ${activeContact?.id === contact.id ? 'bg-lime-50 dark:bg-stone-700' : 'hover:bg-stone-100 dark:hover:bg-stone-700/50'}`}>
                                     <AvatarDisplay url={contact.avatar_url} sizeClass="w-12 h-12" />
-                                    <div className="hidden sm:block">
-                                        <h3 className={`font-semibold ${activeContact?.id === contact.id ? 'text-blue-700' : 'text-gray-800'}`}>{contact.full_name}</h3>
+                                    <div className="hidden sm:block overflow-hidden">
+                                        <h3 className={`font-bold truncate text-[15px] ${activeContact?.id === contact.id ? 'text-lime-700 dark:text-lime-400' : 'text-stone-800 dark:text-stone-200'}`}>{contact.full_name}</h3>
                                     </div>
                                 </div>
                             ))
@@ -185,98 +162,79 @@ const Chat = () => {
                 </div>
 
                 {/* CỘT PHẢI: KHUNG CHAT */}
-                <div className="w-2/3 flex flex-col bg-white relative">
+                <div className="w-2/3 flex flex-col bg-white dark:bg-stone-800 relative">
                     {!activeContact ? (
-                        <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-                            <MessageSquare size={64} className="mb-4 opacity-50" />
-                            <p>Chọn một người để bắt đầu trò chuyện</p>
+                        <div className="flex-1 flex flex-col items-center justify-center text-stone-400 dark:text-stone-500">
+                            <div className="w-24 h-24 bg-stone-100 dark:bg-stone-700 rounded-full flex items-center justify-center mb-4">
+                                <MessageSquare size={40} className="opacity-50" />
+                            </div>
+                            <p className="font-medium">Chọn một người để bắt đầu trò chuyện</p>
                         </div>
                     ) : (
                         <>
                             {/* Header khung chat */}
-                            <div className="p-4 border-b flex items-center justify-between shadow-sm z-10 bg-white">
+                            <div className="p-4 border-b border-stone-100 dark:border-stone-700 flex items-center justify-between z-10 bg-white dark:bg-stone-800">
                                 <div className="flex items-center gap-3">
-                                    <AvatarDisplay url={activeContact.avatar_url} sizeClass="w-10 h-10" />
-                                    <h3 className="font-bold text-gray-800 text-lg">{activeContact.full_name}</h3>
+                                    <AvatarDisplay url={activeContact.avatar_url} sizeClass="w-11 h-11 shadow-sm" />
+                                    <h3 className="font-bold text-stone-900 dark:text-white text-lg">{activeContact.full_name}</h3>
                                 </div>
-                                <Info className="text-blue-500 cursor-pointer hover:text-blue-700" />
+                                <div className="w-10 h-10 rounded-full hover:bg-stone-100 dark:hover:bg-stone-700 flex items-center justify-center cursor-pointer transition text-lime-500">
+                                    <Info size={22} />
+                                </div>
                             </div>
 
                             {/* Lịch sử tin nhắn */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-stone-50 dark:bg-stone-900/30 custom-scrollbar">
                                 {messages.map((msg, index) => {
                                     const isMe = msg.sender_id === currentUser.id;
                                     return (
                                         <div key={msg.id} className={`flex group ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                            
-                                            {/* Nút Thu hồi (Chỉ hiện của mình khi hover) */}
                                             {isMe && (
                                                 <div className="relative flex items-center mr-2 opacity-0 group-hover:opacity-100 transition">
-                                                    <button onClick={(e) => { e.stopPropagation(); setOpenMenuMsgId(openMenuMsgId === msg.id ? null : msg.id); }} className="text-gray-400 hover:text-gray-700 p-1 rounded-full hover:bg-gray-200">
-                                                        <MoreVertical size={16} />
-                                                    </button>
+                                                    <button onClick={(e) => { e.stopPropagation(); setOpenMenuMsgId(openMenuMsgId === msg.id ? null : msg.id); }} className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-300 p-1.5 rounded-full hover:bg-stone-200 dark:hover:bg-stone-700"><MoreVertical size={16} /></button>
                                                     {openMenuMsgId === msg.id && (
-                                                        <div className="absolute right-0 top-full mt-1 bg-white shadow-lg border rounded-lg overflow-hidden z-20" onClick={(e) => e.stopPropagation()}>
-                                                            <button onClick={() => { handleRecallMessage(msg.id); setOpenMenuMsgId(null); }} className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full whitespace-nowrap">
-                                                                <Trash2 size={14} /> Thu hồi
-                                                            </button>
+                                                        <div className="absolute right-0 top-full mt-1 bg-white dark:bg-stone-800 shadow-lg border border-stone-100 dark:border-stone-700 rounded-xl overflow-hidden z-20" onClick={(e) => e.stopPropagation()}>
+                                                            <button onClick={() => { handleRecallMessage(msg.id); setOpenMenuMsgId(null); }} className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 w-full whitespace-nowrap"><Trash2 size={16} /> Thu hồi</button>
                                                         </div>
                                                     )}
                                                 </div>
                                             )}
-
-                                            {/* Bong bóng tin nhắn */}
-                                            <div className={`max-w-[70%] text-sm shadow-sm ${msg.image_url ? 'bg-transparent shadow-none' : (isMe ? 'bg-blue-600 text-white rounded-l-2xl rounded-tr-2xl px-4 py-2' : 'bg-white border text-gray-800 rounded-r-2xl rounded-tl-2xl px-4 py-2')}`}>
-                                                {/* Hiển thị Ảnh nếu có */}
-                                                {msg.image_url && (
-                                                    <img src={msg.image_url} alt="chat-img" className="rounded-2xl max-w-full max-h-60 object-cover shadow-sm border border-gray-100" />
-                                                )}
-                                                {/* Hiển thị chữ nếu có */}
-                                                {msg.content && <div className={msg.image_url ? 'mt-2 bg-blue-600 text-white rounded-2xl px-4 py-2 inline-block' : ''}>{msg.content}</div>}
+                                            <div className={`max-w-[70%] text-[15px] shadow-sm ${msg.image_url ? 'bg-transparent shadow-none' : (isMe ? 'bg-lime-500 text-white rounded-l-2xl rounded-tr-2xl px-4 py-2.5' : 'bg-white dark:bg-stone-700 border border-stone-100 dark:border-stone-600 text-stone-800 dark:text-stone-100 rounded-r-2xl rounded-tl-2xl px-4 py-2.5')}`}>
+                                                {msg.image_url && <img src={msg.image_url} alt="chat" className="rounded-2xl max-w-full max-h-60 object-cover shadow-sm border border-stone-100 dark:border-stone-700" />}
+                                                {msg.content && <div className={msg.image_url ? 'mt-2 bg-lime-500 text-white rounded-2xl px-4 py-2 inline-block shadow-sm' : ''}>{msg.content}</div>}
                                             </div>
                                         </div>
                                     );
                                 })}
 
-                                {/* Hiệu ứng Đang gõ... */}
                                 {isTyping && (
                                     <div className="flex justify-start">
-                                        <div className="bg-white border text-gray-500 rounded-full px-4 py-2 flex items-center gap-1 shadow-sm">
-                                            <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
-                                            <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
-                                            <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></span>
+                                        <div className="bg-white dark:bg-stone-700 border border-stone-100 dark:border-stone-600 text-stone-500 rounded-full px-4 py-2.5 flex items-center gap-1 shadow-sm">
+                                            <span className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-400 rounded-full animate-bounce"></span>
+                                            <span className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
+                                            <span className="w-1.5 h-1.5 bg-stone-400 dark:bg-stone-400 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></span>
                                         </div>
                                     </div>
                                 )}
-                                
                                 <div ref={messagesEndRef} />
                             </div>
 
-                            {/* Ô nhập tin nhắn */}
-                            <div className="p-3 border-t bg-white">
-                                <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
-                                    {/* Nút gửi ảnh */}
-                                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingImage} className="text-gray-500 hover:text-green-500 p-2 rounded-full transition disabled:opacity-50">
-                                        {uploadingImage ? <Loader2 size={24} className="animate-spin text-green-500" /> : <ImageIcon size={24} />}
+                            {/* Ô nhập */}
+                            <div className="p-4 border-t border-stone-100 dark:border-stone-700 bg-white dark:bg-stone-800">
+                                <form onSubmit={handleSendMessage} className="flex gap-3 items-center bg-stone-100 dark:bg-stone-700 rounded-full p-1 pl-2">
+                                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingImage} className="text-lime-500 hover:text-lime-600 dark:hover:text-lime-400 p-2 rounded-full transition hover:bg-stone-200 dark:hover:bg-stone-600 disabled:opacity-50">
+                                        {uploadingImage ? <Loader2 size={24} className="animate-spin" /> : <ImageIcon size={24} />}
                                     </button>
                                     <input type="file" accept="image/*" ref={fileInputRef} onChange={handleSendImage} className="hidden" />
-
-                                    <input 
-                                        type="text" 
-                                        value={newMessage} 
-                                        onChange={handleTyping} // Đã thêm sự kiện bắt gõ phím
-                                        placeholder="Nhập tin nhắn..." 
-                                        className="flex-1 bg-gray-100 border-none rounded-full py-2.5 px-5 outline-none focus:ring-2 focus:ring-blue-200"
-                                    />
-                                    <button type="submit" disabled={!newMessage.trim()} className="bg-blue-600 text-white p-2.5 rounded-full hover:bg-blue-700 disabled:opacity-50 transition">
-                                        <Send size={20} className="translate-x-[-1px]" />
+                                    <input type="text" value={newMessage} onChange={handleTyping} placeholder="Nhập tin nhắn..." className="flex-1 bg-transparent border-none py-2.5 px-2 outline-none text-stone-800 dark:text-white text-[15px]" />
+                                    <button type="submit" disabled={!newMessage.trim()} className="bg-lime-500 text-white w-10 h-10 rounded-full flex justify-center items-center hover:bg-lime-600 disabled:opacity-50 disabled:bg-stone-300 dark:disabled:bg-stone-600 transition shadow-sm">
+                                        <Send size={18} className="translate-x-[-1px] translate-y-[1px]" />
                                     </button>
                                 </form>
                             </div>
                         </>
                     )}
                 </div>
-
             </div>
         </div>
     );

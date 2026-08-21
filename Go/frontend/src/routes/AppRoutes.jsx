@@ -7,6 +7,10 @@ import Profile from '../pages/Profile';
 import PostDetail from '../pages/PostDetail';
 import MainLayout from '../layouts/MainLayout';
 import useAuthStore from '../store/useAuthStore';
+import Search from '../pages/Search';
+import Groups from '../pages/Groups';
+import GroupDetail from '../pages/GroupDetail';
+
 
 import Chat from '../pages/Chat';
 
@@ -25,6 +29,9 @@ const AppRoutes = () => {
                 <Route path="/profile/:id" element={<Profile />} />
                 <Route path="/post/:id" element={<PostDetail />} />
                 <Route path="/chat" element={<Chat />} />
+                <Route path="/search" element={<Search />} />
+                <Route path="/groups" element={<Groups />} />
+                <Route path="/groups/:id" element={<GroupDetail />} />
             </Route>
         </Routes>
     );

@@ -6,6 +6,8 @@ type CreatePostRequest struct {
 	Content      string   `json:"content"`
 	SharedPostID *string  `json:"shared_post_id,omitempty"`
 	MediaURLs    []string `json:"media_urls"` // THÊM MỚI: Danh sách link ảnh/video
+
+	GroupID *string `json:"group_id,omitempty"`
 }
 
 type PostResponse struct {
@@ -18,6 +20,7 @@ type PostResponse struct {
 	CommentsCount int       `json:"comments_count"`
 	SharesCount   int       `json:"shares_count"`
 	CreatedAt     time.Time `json:"created_at"`
+	GroupID       *string   `json:"group_id,omitempty"`
 }
 
 type AuthorInfo struct {
@@ -43,4 +46,5 @@ type FeedPostResponse struct {
 	CommentsCount int               `json:"comments_count"`
 	SharesCount   int               `json:"shares_count"`
 	CreatedAt     time.Time         `json:"created_at"`
+	GroupID       *string           `json:"group_id,omitempty"`
 }

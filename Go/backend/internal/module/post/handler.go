@@ -140,3 +140,22 @@ func (h *PostHandler) UploadMedia(c *gin.Context) {
 
 	response.Success(c, http.StatusOK, "Upload thành công", gin.H{"url": uploadResult.SecureURL})
 }
+
+func (h *PostHandler) GetGroupPosts(c *gin.Context) {
+	userID, _ := c.Get("user_id") // THÊM DÒNG NÀY ĐỂ LẤY ID NGƯỜI ĐANG YÊU CẦU XEM
+	groupID := c.Param("id")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	// CHUYỀN THÊM userID VÀO ĐÂY ĐỂ SERVICE KIỂM TRA
+	res, err := h.service.GetGroupPosts(groupID, userID.(string), limit, page)
+
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if res == nil {
+		res = []FeedPostResponse{}
+	}
+	response.Success(c, http.StatusOK, "Thành công", res)
+}
