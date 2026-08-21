@@ -17,6 +17,10 @@ type PostService interface {
 	// Features mới: Bookmark bài viết
 	ToggleSavePost(userID, postID string) (bool, error)
 	GetSavedPosts(userID string, limit int, page int) ([]FeedPostResponse, error)
+
+	// Features mới: Search & Report
+	SearchPosts(keyword string, limit int, page int) ([]FeedPostResponse, error)
+	ReportPost(userID, postID, reason string) error
 }
 
 type postService struct{ repo PostRepository }
@@ -160,4 +164,37 @@ func (s *postService) GetSavedPosts(userID string, limit int, page int) ([]FeedP
 		result = append(result, mapPostToResponse(p))
 	}
 	return result, nil
+}
+
+func (s *postService) SearchPosts(keyword string, limit int, page int) ([]FeedPostResponse, error) {
+	offset := (page - 1) * limit
+	posts, err := s.repo.SearchPosts(keyword, limit, offset)
+	if err != nil {
+		return nil, errors.New("lỗi tìm kiếm bài viết")
+	}
+
+	var result []FeedPostResponse
+	for _, p := range posts {
+		result = append(result, mapPostToResponse(p))
+	}
+	return result, nil
+}
+
+func (s *postService) ReportPost(userID, postID, reason string) error {
+	// Kiểm tra xem bài viết có tồn tại không
+	_, err := s.repo.GetPostByID(postID)
+	if err != nil {
+		return errors.New("bài viết không tồn tại")
+	}
+
+	report := &PostReport{
+		ReporterID: userID,
+		PostID:     postID,
+		Reason:     reason,
+	}
+
+	if err := s.repo.ReportPost(report); err != nil {
+		return errors.New("không thể báo cáo bài viết lúc này")
+	}
+	return nil
 }
