@@ -13,7 +13,10 @@ type UserService interface {
 	GetProfile(userID string) (*UserResponse, error)
 	GetUserProfile(targetUserID string, currentUserID string) (*UserProfileResponse, error)
 	SearchUsers(keyword string) ([]UserProfileResponse, error)
-	UpdateProfile(userID string, req UpdateProfileRequest) (*UserResponse, error) // MỚI
+	UpdateProfile(userID string, req UpdateProfileRequest) (*UserResponse, error)
+	// Lấy danh sách người follow / đang follow
+	GetFollowers(userID string) ([]UserProfileResponse, error)
+	GetFollowing(userID string) ([]UserProfileResponse, error)
 }
 
 type userService struct{ repo UserRepository }
@@ -76,7 +79,7 @@ func (s *userService) SearchUsers(keyword string) ([]UserProfileResponse, error)
 	return result, nil
 }
 
-// MỚI: Xử lý cập nhật Profile
+// Xử lý cập nhật Profile
 func (s *userService) UpdateProfile(userID string, req UpdateProfileRequest) (*UserResponse, error) {
 	updates := map[string]interface{}{
 		"full_name": req.FullName,
@@ -90,4 +93,34 @@ func (s *userService) UpdateProfile(userID string, req UpdateProfileRequest) (*U
 		return nil, errors.New("lỗi cập nhật")
 	}
 	return s.GetProfile(userID)
+}
+
+// GetFollowers trả về danh sách người đang follow userID
+func (s *userService) GetFollowers(userID string) ([]UserProfileResponse, error) {
+	users, err := s.repo.GetFollowers(userID)
+	if err != nil {
+		return nil, errors.New("lỗi tải danh sách followers")
+	}
+	result := make([]UserProfileResponse, 0, len(users))
+	for _, u := range users {
+		result = append(result, UserProfileResponse{
+			ID: u.ID, Username: u.Username, FullName: u.FullName, AvatarURL: u.AvatarURL,
+		})
+	}
+	return result, nil
+}
+
+// GetFollowing trả về danh sách người mà userID đang follow
+func (s *userService) GetFollowing(userID string) ([]UserProfileResponse, error) {
+	users, err := s.repo.GetFollowing(userID)
+	if err != nil {
+		return nil, errors.New("lỗi tải danh sách following")
+	}
+	result := make([]UserProfileResponse, 0, len(users))
+	for _, u := range users {
+		result = append(result, UserProfileResponse{
+			ID: u.ID, Username: u.Username, FullName: u.FullName, AvatarURL: u.AvatarURL,
+		})
+	}
+	return result, nil
 }
