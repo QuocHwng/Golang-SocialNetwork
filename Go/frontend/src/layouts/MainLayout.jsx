@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import axiosClient from '../services/api/axiosClient';
 import useAuthStore from '../store/useAuthStore';
-import { Bell, LogOut, Search, UserCircle, MessageSquare, Sun, Moon, Settings, HelpCircle, ChevronDown, Users } from 'lucide-react';
+import { Bell, LogOut, Search, UserCircle, MessageSquare, Sun, Moon, Settings, HelpCircle, ChevronDown, Users, Bookmark } from 'lucide-react';
 // IMPORT LOGO KIWI CỦA BẠN VÀO ĐÂY
 import logoImg from '../assets/logo.png';
 
@@ -174,6 +174,11 @@ const MainLayout = () => {
                                     </Link>
 
                                     <div className="space-y-1">
+                                        <Link to="/saved" onClick={closeAllMenus} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-stone-50 dark:hover:bg-stone-700 transition text-stone-700 dark:text-stone-200 font-medium">
+                                            <div className="w-9 h-9 bg-stone-100 dark:bg-stone-600 rounded-full flex justify-center items-center text-stone-600 dark:text-stone-300"><Bookmark size={18} /></div>
+                                            Bài viết đã lưu
+                                        </Link>
+                                        
                                         <button className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-stone-50 dark:hover:bg-stone-700 transition text-stone-700 dark:text-stone-200 font-medium">
                                             <div className="w-9 h-9 bg-stone-100 dark:bg-stone-600 rounded-full flex justify-center items-center text-stone-600 dark:text-stone-300"><Settings size={18} /></div>
                                             Cài đặt & quyền riêng tư

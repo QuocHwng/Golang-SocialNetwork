@@ -10,7 +10,7 @@ import useAuthStore from '../store/useAuthStore';
 import Search from '../pages/Search';
 import Groups from '../pages/Groups';
 import GroupDetail from '../pages/GroupDetail';
-
+import SavedPosts from '../pages/SavedPosts';
 
 import Chat from '../pages/Chat';
 
@@ -30,6 +30,7 @@ const AppRoutes = () => {
                 <Route path="/post/:id" element={<PostDetail />} />
                 <Route path="/chat" element={<Chat />} />
                 <Route path="/search" element={<Search />} />
+                <Route path="/saved" element={<SavedPosts />} />
                 <Route path="/groups" element={<Groups />} />
                 <Route path="/groups/:id" element={<GroupDetail />} />
             </Route>

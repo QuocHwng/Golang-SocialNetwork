@@ -92,9 +92,11 @@ func SetupRouter() *gin.Engine {
 		// ── Post ─────────────────────────────────────────────────────────
 		protected.POST("/posts", postHandler.CreatePost)
 		protected.GET("/posts", postHandler.GetNewsFeed)
+		protected.GET("/posts/saved", postHandler.GetSavedPosts) // [NEW] Lấy bài đã lưu (PHẢI NẰM TRÊN :id)
 		protected.GET("/posts/:id", postHandler.GetPostByID)
 		protected.PUT("/posts/:id", postHandler.UpdatePost)
 		protected.DELETE("/posts/:id", postHandler.DeletePost)
+		protected.POST("/posts/:id/save", postHandler.ToggleSavePost) // [NEW] Lưu / Bỏ lưu bài
 		protected.POST("/upload", postHandler.UploadMedia)
 
 		// ── Interaction ──────────────────────────────────────────────────

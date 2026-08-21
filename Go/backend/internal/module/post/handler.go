@@ -159,3 +159,36 @@ func (h *PostHandler) GetGroupPosts(c *gin.Context) {
 	}
 	response.Success(c, http.StatusOK, "Thành công", res)
 }
+
+func (h *PostHandler) ToggleSavePost(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	postID := c.Param("id")
+
+	isSaved, err := h.service.ToggleSavePost(userID.(string), postID)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	msg := "Đã lưu bài viết"
+	if !isSaved {
+		msg = "Đã bỏ lưu bài viết"
+	}
+	response.Success(c, http.StatusOK, msg, gin.H{"is_saved": isSaved})
+}
+
+func (h *PostHandler) GetSavedPosts(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	res, err := h.service.GetSavedPosts(userID.(string), limit, page)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if res == nil {
+		res = []FeedPostResponse{}
+	}
+	response.Success(c, http.StatusOK, "Danh sách bài viết đã lưu", res)
+}
