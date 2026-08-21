@@ -3,6 +3,7 @@ package server
 import (
 	"social-network/internal/middleware"
 	"social-network/internal/module/chat"
+	"social-network/internal/module/group"
 	"social-network/internal/module/interaction"
 	"social-network/internal/module/notification"
 	"social-network/internal/module/post"
@@ -46,6 +47,11 @@ func SetupRouter() *gin.Engine {
 	chatRepo := chat.NewChatRepository(database.DB)
 	chatService := chat.NewChatService(chatRepo, userRepo)
 	chatHandler := chat.NewChatHandler(chatService)
+
+	// Khởi tạo Module Group
+	groupRepo := group.NewGroupRepository(database.DB)
+	groupService := group.NewGroupService(groupRepo)
+	groupHandler := group.NewGroupHandler(groupService)
 
 	// 2. KHAI BÁO CÁC ĐƯỜNG DẪN API (ROUTES)
 	v1 := r.Group("/api/v1")
@@ -97,6 +103,19 @@ func SetupRouter() *gin.Engine {
 		protected.POST("/chat/:id", chatHandler.SendMessage)
 		protected.DELETE("/chat/messages/:msgId", chatHandler.RecallMessage) // Thu hồi
 		protected.POST("/chat/:id/typing", chatHandler.SendTyping)           //đang type
+
+		//group
+		protected.POST("/groups", groupHandler.CreateGroup)
+		protected.GET("/groups", groupHandler.GetAllGroups)
+		protected.GET("/groups/:id", groupHandler.GetGroupDetail)
+		protected.POST("/groups/:id/join", groupHandler.ToggleJoinGroup)
+		protected.GET("/groups/:id/posts", postHandler.GetGroupPosts)
+
+		protected.GET("/groups/:id/requests", groupHandler.GetPendingRequests)
+		protected.POST("/groups/:id/requests/:userId", groupHandler.HandleRequest)
+		// THÊM 2 DÒNG NÀY:
+		protected.GET("/groups/:id/members", groupHandler.GetGroupMembers)
+		protected.DELETE("/groups/:id/members/:userId", groupHandler.RemoveMember)
 
 	}
 

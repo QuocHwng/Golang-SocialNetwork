@@ -1,3 +1,122 @@
+// package post
+
+// import (
+// 	"time"
+
+// 	"gorm.io/gorm"
+// )
+
+// type PostAuthor struct {
+// 	ID        string `gorm:"primaryKey"`
+// 	FullName  string
+// 	AvatarURL string
+// }
+
+// func (PostAuthor) TableName() string { return "users" }
+
+// type PostMedia struct {
+// 	ID        string `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+// 	PostID    string `gorm:"type:uuid;not null"`
+// 	MediaURL  string
+// 	MediaType string
+// }
+
+// type Post struct {
+// 	ID            string     `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+// 	UserID        string     `gorm:"type:uuid;not null"`
+// 	Author        PostAuthor `gorm:"foreignKey:UserID;references:ID"`
+// 	Content       string
+// 	SharedPostID  *string     `gorm:"type:uuid"`
+// 	SharedPost    *Post       `gorm:"foreignKey:SharedPostID"`
+// 	Media         []PostMedia `gorm:"foreignKey:PostID"`
+// 	LikesCount    int         `gorm:"default:0"`
+// 	CommentsCount int         `gorm:"default:0"`
+// 	SharesCount   int         `gorm:"default:0"`
+// 	CreatedAt     time.Time
+// 	UpdatedAt     time.Time
+// 	GroupID       *string `gorm:"type:uuid;index"`
+// }
+
+// type PostRepository interface {
+// 	CreatePost(post *Post) error
+// 	CreatePostMedia(media *PostMedia) error
+// 	IncrementShareCount(postID string) error
+// 	GetNewsFeed(userID string, limit int, offset int) ([]Post, error)
+// 	GetPostsByUserID(userID string, limit int, offset int) ([]Post, error)
+// 	GetPostByID(postID string) (*Post, error)
+// 	DeletePost(postID string, userID string) error
+// 	UpdatePost(postID string, userID string, content string) error // MỚI
+// }
+
+// type postRepo struct{ db *gorm.DB }
+
+// func NewPostRepository(db *gorm.DB) PostRepository { return &postRepo{db: db} }
+
+// func (r *postRepo) CreatePost(post *Post) error            { return r.db.Create(post).Error }
+// func (r *postRepo) CreatePostMedia(media *PostMedia) error { return r.db.Create(media).Error }
+// func (r *postRepo) IncrementShareCount(postID string) error {
+// 	return r.db.Model(&Post{}).Where("id = ?", postID).UpdateColumn("shares_count", gorm.Expr("shares_count + ?", 1)).Error
+// }
+
+// // func (r *postRepo) GetNewsFeed(userID string, limit int, offset int) ([]Post, error) {
+// // 	var posts []Post
+// // 	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").Where("user_id = ? OR user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)", userID, userID).Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
+// // 	return posts, err
+// // }
+
+// func (r *postRepo) GetNewsFeed(userID string, limit int, offset int) ([]Post, error) {
+// 	var posts []Post
+// 	// CHỈ LẤY BÀI KHÔNG THUỘC NHÓM (group_id IS NULL)
+// 	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").
+// 		Where("(user_id = ? OR user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)) AND group_id IS NULL", userID, userID).
+// 		Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
+// 	return posts, err
+// }
+
+// func (r *postRepo) GetPostsByUserID(userID string, limit int, offset int) ([]Post, error) {
+// 	var posts []Post
+// 	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").Where("user_id = ?", userID).Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
+// 	return posts, err
+// }
+
+// func (r *postRepo) GetPostByID(postID string) (*Post, error) {
+// 	var post Post
+// 	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").Where("id = ?", postID).First(&post).Error
+// 	return &post, err
+// }
+// func (r *postRepo) DeletePost(postID string, userID string) error {
+// 	res := r.db.Where("id = ? AND user_id = ?", postID, userID).Delete(&Post{})
+// 	if res.Error != nil {
+// 		return res.Error
+// 	}
+// 	if res.RowsAffected == 0 {
+// 		return gorm.ErrRecordNotFound
+// 	}
+// 	return nil
+// }
+
+// // HÀM MỚI
+// func (r *postRepo) UpdatePost(postID string, userID string, content string) error {
+// 	res := r.db.Model(&Post{}).Where("id = ? AND user_id = ?", postID, userID).Update("content", content)
+// 	if res.Error != nil {
+// 		return res.Error
+// 	}
+// 	if res.RowsAffected == 0 {
+// 		return gorm.ErrRecordNotFound
+// 	}
+// 	return nil
+// }
+
+// //post group
+//
+//	func (r *postRepo) GetGroupPosts(groupID string, limit int, offset int) ([]Post, error) {
+//		var posts []Post
+//		err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").
+//			Where("group_id = ?", groupID).
+//			Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
+//		return posts, err
+//	}
+
 package post
 
 import (
@@ -28,6 +147,7 @@ type Post struct {
 	Content       string
 	SharedPostID  *string     `gorm:"type:uuid"`
 	SharedPost    *Post       `gorm:"foreignKey:SharedPostID"`
+	GroupID       *string     `gorm:"type:uuid;index"` // Lưu ID của nhóm nếu đăng trong nhóm
 	Media         []PostMedia `gorm:"foreignKey:PostID"`
 	LikesCount    int         `gorm:"default:0"`
 	CommentsCount int         `gorm:"default:0"`
@@ -44,33 +164,46 @@ type PostRepository interface {
 	GetPostsByUserID(userID string, limit int, offset int) ([]Post, error)
 	GetPostByID(postID string) (*Post, error)
 	DeletePost(postID string, userID string) error
-	UpdatePost(postID string, userID string, content string) error // MỚI
+	UpdatePost(postID string, userID string, content string) error
+	GetGroupPosts(groupID string, limit int, offset int) ([]Post, error)
+	CheckGroupMember(groupID string, userID string) bool // HÀM MỚI BẢO MẬT NHÓM
 }
 
 type postRepo struct{ db *gorm.DB }
 
-func NewPostRepository(db *gorm.DB) PostRepository { return &postRepo{db: db} }
+func NewPostRepository(db *gorm.DB) PostRepository {
+	db.AutoMigrate(&Post{}, &PostMedia{}) // Đảm bảo GORM tạo đủ cột GroupID
+	return &postRepo{db: db}
+}
 
 func (r *postRepo) CreatePost(post *Post) error            { return r.db.Create(post).Error }
 func (r *postRepo) CreatePostMedia(media *PostMedia) error { return r.db.Create(media).Error }
 func (r *postRepo) IncrementShareCount(postID string) error {
 	return r.db.Model(&Post{}).Where("id = ?", postID).UpdateColumn("shares_count", gorm.Expr("shares_count + ?", 1)).Error
 }
+
+// CHỈ LẤY BÀI KHÔNG THUỘC NHÓM CHO NEWS FEED
 func (r *postRepo) GetNewsFeed(userID string, limit int, offset int) ([]Post, error) {
 	var posts []Post
-	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").Where("user_id = ? OR user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)", userID, userID).Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
+	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").
+		Where("(user_id = ? OR user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)) AND group_id IS NULL", userID, userID).
+		Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
 	return posts, err
 }
+
 func (r *postRepo) GetPostsByUserID(userID string, limit int, offset int) ([]Post, error) {
 	var posts []Post
-	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").Where("user_id = ?", userID).Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
+	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").
+		Where("user_id = ? AND group_id IS NULL", userID).Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
 	return posts, err
 }
+
 func (r *postRepo) GetPostByID(postID string) (*Post, error) {
 	var post Post
 	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").Where("id = ?", postID).First(&post).Error
 	return &post, err
 }
+
 func (r *postRepo) DeletePost(postID string, userID string) error {
 	res := r.db.Where("id = ? AND user_id = ?", postID, userID).Delete(&Post{})
 	if res.Error != nil {
@@ -82,7 +215,6 @@ func (r *postRepo) DeletePost(postID string, userID string) error {
 	return nil
 }
 
-// HÀM MỚI
 func (r *postRepo) UpdatePost(postID string, userID string, content string) error {
 	res := r.db.Model(&Post{}).Where("id = ? AND user_id = ?", postID, userID).Update("content", content)
 	if res.Error != nil {
@@ -92,4 +224,20 @@ func (r *postRepo) UpdatePost(postID string, userID string, content string) erro
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+func (r *postRepo) GetGroupPosts(groupID string, limit int, offset int) ([]Post, error) {
+	var posts []Post
+	err := r.db.Preload("Author").Preload("Media").Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").
+		Where("group_id = ?", groupID).
+		Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
+	return posts, err
+}
+
+// HÀM MỚI BẢO MẬT: Kiểm tra xem user có nằm trong nhóm không
+func (r *postRepo) CheckGroupMember(groupID string, userID string) bool {
+	var count int64
+	// Truy vấn ngang sang bảng group_members
+	r.db.Table("group_members").Where("group_id = ? AND user_id = ?", groupID, userID).Count(&count)
+	return count > 0
 }
