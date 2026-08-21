@@ -47,6 +47,15 @@ type SavedPost struct {
 	CreatedAt time.Time
 }
 
+// PostReport đại diện cho báo cáo bài viết vi phạm
+type PostReport struct {
+	ID         string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ReporterID string    `gorm:"type:uuid;not null"`
+	PostID     string    `gorm:"type:uuid;not null"`
+	Reason     string    `gorm:"type:text"`
+	CreatedAt  time.Time
+}
+
 type PostRepository interface {
 	CreatePost(post *Post) error
 	CreatePostMedia(media *PostMedia) error
@@ -62,12 +71,16 @@ type PostRepository interface {
 	// Features mới: Bookmark bài viết
 	ToggleSavePost(userID, postID string) (bool, error)
 	GetSavedPosts(userID string, limit int, offset int) ([]Post, error)
+
+	// Features: Search và Report
+	SearchPosts(keyword string, limit int, offset int) ([]Post, error)
+	ReportPost(report *PostReport) error
 }
 
 type postRepo struct{ db *gorm.DB }
 
 func NewPostRepository(db *gorm.DB) PostRepository {
-	db.AutoMigrate(&SavedPost{}) // Tự động tạo bảng saved_posts
+	db.AutoMigrate(&SavedPost{}, &PostReport{}) // Tự động tạo bảng
 	return &postRepo{db: db}
 }
 
@@ -178,4 +191,17 @@ func (r *postRepo) GetSavedPosts(userID string, limit int, offset int) ([]Post, 
 		Order("saved_posts.created_at desc").
 		Limit(limit).Offset(offset).Find(&posts).Error
 	return posts, err
+}
+
+func (r *postRepo) SearchPosts(keyword string, limit int, offset int) ([]Post, error) {
+	var posts []Post
+	err := r.db.Preload("Author").Preload("Media").
+		Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").
+		Where("content ILIKE ? AND group_id IS NULL", "%"+keyword+"%").
+		Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
+	return posts, err
+}
+
+func (r *postRepo) ReportPost(report *PostReport) error {
+	return r.db.Create(report).Error
 }

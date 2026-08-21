@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"social-network/internal/pkg/response"
 
@@ -191,4 +192,45 @@ func (h *PostHandler) GetSavedPosts(c *gin.Context) {
 		res = []FeedPostResponse{}
 	}
 	response.Success(c, http.StatusOK, "Danh sách bài viết đã lưu", res)
+}
+
+func (h *PostHandler) SearchPosts(c *gin.Context) {
+	keyword := c.Query("q")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	if strings.TrimSpace(keyword) == "" {
+		response.Success(c, http.StatusOK, "Thành công", []FeedPostResponse{})
+		return
+	}
+
+	res, err := h.service.SearchPosts(keyword, limit, page)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if res == nil {
+		res = []FeedPostResponse{}
+	}
+	response.Success(c, http.StatusOK, "Kết quả tìm kiếm", res)
+}
+
+func (h *PostHandler) ReportPost(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	postID := c.Param("id")
+
+	var req struct {
+		Reason string `json:"reason" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "Lý do báo cáo không hợp lệ")
+		return
+	}
+
+	if err := h.service.ReportPost(userID.(string), postID, req.Reason); err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Cảm ơn bạn đã báo cáo. Quản trị viên sẽ xem xét sớm nhất.", nil)
 }

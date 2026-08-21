@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axiosClient from '../services/api/axiosClient';
 import useAuthStore from '../store/useAuthStore';
-import { Heart, MessageCircle, Share2, UserCircle, Send, Image as ImageIcon, X, Loader2, MoreHorizontal, Trash2, Edit3, Check, Smile, MapPin, Globe, Bookmark } from 'lucide-react';
+import { Heart, MessageCircle, Share2, UserCircle, Send, Image as ImageIcon, X, Loader2, MoreHorizontal, Trash2, Edit3, Check, Smile, MapPin, Globe, Bookmark, Flag } from 'lucide-react';
 
 // --- SKELETON LOADING ---
 const PostSkeleton = () => (
@@ -191,6 +191,19 @@ const Home = () => {
                                         <button onClick={() => handleToggleSave(post.id)} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-stone-700 rounded-xl transition">
                                             <Bookmark size={16} className={post.is_saved ? "fill-current text-lime-500" : ""} /> {post.is_saved ? "Bỏ lưu bài viết" : "Lưu bài viết"}
                                         </button>
+                                        
+                                        {user?.id !== post.author?.id && (
+                                            <button onClick={() => {
+                                                const reason = prompt("Lý do báo cáo bài viết này:");
+                                                if (reason) {
+                                                    axiosClient.post(`/posts/${post.id}/report`, { reason }).then(res => alert(res.data.message)).catch(e => alert("Lỗi khi báo cáo"));
+                                                }
+                                                setOpenPostMenuId(null);
+                                            }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition">
+                                                <Flag size={16} /> Báo cáo bài viết
+                                            </button>
+                                        )}
+
                                         {user?.id === post.author?.id && (
                                             <>
                                                 <button onClick={() => { setEditingPostId(post.id); setEditPostContent(post.content); setOpenPostMenuId(null); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-stone-700 rounded-xl transition"><Edit3 size={16} /> Chỉnh sửa</button>
