@@ -12,7 +12,7 @@ type Group struct {
 	Description  string
 	CoverURL     string
 	CreatorID    string `gorm:"type:uuid;not null"`
-	MembersCount int    `gorm:"default:1"`
+	MembersCount int    `gorm:"default:0"` // FIX: default 0, vì khi tạo group creator sẽ gọi JoinGroup(+1)
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
