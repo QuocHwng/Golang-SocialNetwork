@@ -89,7 +89,8 @@ func (r *interactionRepo) ToggleLike(postID string, userID string) (bool, error)
 		if err := tx.Delete(&like).Error; err != nil {
 			return err
 		}
-		if err := tx.Exec("UPDATE posts SET likes_count = likes_count - 1 WHERE id = ?", postID).Error; err != nil {
+		// Dùng GREATEST để đảm bảo likes_count không bao giờ âm
+		if err := tx.Exec("UPDATE posts SET likes_count = GREATEST(likes_count - 1, 0) WHERE id = ?", postID).Error; err != nil {
 			return err
 		}
 		isLiked = false
@@ -103,7 +104,6 @@ func (r *interactionRepo) ToggleLike(postID string, userID string) (bool, error)
 // =====================================================================
 func (r *interactionRepo) CreateComment(comment *Comment) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		// TIẾN HÀNH TẠO COMMENT
 		if err := tx.Create(comment).Error; err != nil {
 			return err
 		}
@@ -165,10 +165,11 @@ func (r *interactionRepo) ToggleFollow(followerID string, followingID string) (b
 		if err := tx.Delete(&follow).Error; err != nil {
 			return err
 		}
-		if err := tx.Exec("UPDATE users SET following_count = following_count - 1 WHERE id = ?", followerID).Error; err != nil {
+		// Dùng GREATEST để đảm bảo counter không bao giờ âm
+		if err := tx.Exec("UPDATE users SET following_count = GREATEST(following_count - 1, 0) WHERE id = ?", followerID).Error; err != nil {
 			return err
 		}
-		if err := tx.Exec("UPDATE users SET followers_count = followers_count - 1 WHERE id = ?", followingID).Error; err != nil {
+		if err := tx.Exec("UPDATE users SET followers_count = GREATEST(followers_count - 1, 0) WHERE id = ?", followingID).Error; err != nil {
 			return err
 		}
 		isFollowing = false
@@ -197,8 +198,8 @@ func (r *interactionRepo) DeleteComment(commentID string, userID string) error {
 		if err := tx.Delete(&cmt).Error; err != nil {
 			return err
 		}
-		// Xóa xong phải trừ comments_count đi 1
-		if err := tx.Exec("UPDATE posts SET comments_count = comments_count - 1 WHERE id = ?", cmt.PostID).Error; err != nil {
+		// Dùng GREATEST để đảm bảo comments_count không bao giờ âm
+		if err := tx.Exec("UPDATE posts SET comments_count = GREATEST(comments_count - 1, 0) WHERE id = ?", cmt.PostID).Error; err != nil {
 			return err
 		}
 		return nil

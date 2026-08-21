@@ -27,7 +27,10 @@ type UserRepository interface {
 	FindByID(id string) (*User, error)
 	SearchUsers(keyword string) ([]User, error)
 	CheckIsFollowing(followerID, followingID string) bool
-	UpdateProfile(userID string, data map[string]interface{}) error // MỚI
+	UpdateProfile(userID string, data map[string]interface{}) error
+	// Lấy danh sách người follow / đang follow của một user
+	GetFollowers(userID string) ([]User, error)
+	GetFollowing(userID string) ([]User, error)
 }
 
 type userRepo struct{ db *gorm.DB }
@@ -64,4 +67,24 @@ func (r *userRepo) CheckIsFollowing(followerID, followingID string) bool {
 // MỚI: Cập nhật thông tin
 func (r *userRepo) UpdateProfile(userID string, data map[string]interface{}) error {
 	return r.db.Model(&User{}).Where("id = ?", userID).Updates(data).Error
+}
+
+// GetFollowers lấy danh sách người đang follow userID (họ follow mình)
+func (r *userRepo) GetFollowers(userID string) ([]User, error) {
+	var users []User
+	err := r.db.
+		Joins("JOIN follows ON follows.follower_id = users.id").
+		Where("follows.following_id = ?", userID).
+		Find(&users).Error
+	return users, err
+}
+
+// GetFollowing lấy danh sách người mà userID đang follow (mình follow họ)
+func (r *userRepo) GetFollowing(userID string) ([]User, error) {
+	var users []User
+	err := r.db.
+		Joins("JOIN follows ON follows.following_id = users.id").
+		Where("follows.follower_id = ?", userID).
+		Find(&users).Error
+	return users, err
 }

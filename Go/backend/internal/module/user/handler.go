@@ -112,3 +112,25 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	}
 	response.Success(c, http.StatusOK, "Cập nhật thành công", res)
 }
+
+// Xem danh sách Followers của một user (GET /users/:id/followers)
+func (h *UserHandler) GetFollowers(c *gin.Context) {
+	targetUserID := c.Param("id")
+	res, err := h.service.GetFollowers(targetUserID)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.Success(c, http.StatusOK, "Thành công", res)
+}
+
+// Xem danh sách Following của một user (GET /users/:id/following)
+func (h *UserHandler) GetFollowing(c *gin.Context) {
+	targetUserID := c.Param("id")
+	res, err := h.service.GetFollowing(targetUserID)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.Success(c, http.StatusOK, "Thành công", res)
+}

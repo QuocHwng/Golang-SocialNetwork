@@ -7,25 +7,39 @@ import (
 )
 
 type Message struct {
-	ID         string `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	SenderID   string `gorm:"type:uuid;not null;index"`
-	ReceiverID string `gorm:"type:uuid;not null;index"`
+	ID         string    `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	SenderID   string    `gorm:"type:uuid;not null;index"`
+	ReceiverID string    `gorm:"type:uuid;not null;index"`
 	Content    string
-	ImageURL   string    // MỚI: Link ảnh
+	ImageURL   string    // Link ảnh đính kèm
+	IsRecalled bool      `gorm:"default:false"` // true = tin nhắn đã bị thu hồi (soft delete)
 	CreatedAt  time.Time `gorm:"index"`
 }
+
+// ContactUser là view rút gọn của User, dùng để lấy thông tin liên hệ
+type ContactUser struct {
+	ID        string `gorm:"primaryKey"`
+	FullName  string
+	AvatarURL string
+}
+
+func (ContactUser) TableName() string { return "users" }
 
 type ChatRepository interface {
 	SaveMessage(msg *Message) error
 	GetMessages(user1, user2 string) ([]Message, error)
 	GetContactIDs(userID string) ([]string, error)
-	DeleteMessage(msgID, senderID string) error // MỚI: Thu hồi tin nhắn
+	// FindContactsByIDs trả về thông tin user theo danh sách IDs — dùng thay cho N+1 query
+	FindContactsByIDs(ids []string) ([]ContactUser, error)
+	RecallMessage(msgID, senderID string) error // Soft-delete: đánh dấu thu hồi, không xóa DB
 }
 
 type chatRepo struct{ db *gorm.DB }
 
+// NewChatRepository khởi tạo repository cho Chat.
+// AutoMigrate được giữ tạm thời để thêm cột IsRecalled vào bảng messages hiện có.
 func NewChatRepository(db *gorm.DB) ChatRepository {
-	db.AutoMigrate(&Message{}) // Tự động thêm cột ImageURL vào DB
+	db.AutoMigrate(&Message{})
 	return &chatRepo{db: db}
 }
 
@@ -47,9 +61,22 @@ func (r *chatRepo) GetContactIDs(userID string) ([]string, error) {
 	return ids, err
 }
 
-// MỚI: Logic xóa (chỉ được xóa tin nhắn của chính mình gửi)
-func (r *chatRepo) DeleteMessage(msgID, senderID string) error {
-	res := r.db.Where("id = ? AND sender_id = ?", msgID, senderID).Delete(&Message{})
+// FindContactsByIDs lấy thông tin nhiều user cùng lúc bằng 1 query — thay cho N+1
+func (r *chatRepo) FindContactsByIDs(ids []string) ([]ContactUser, error) {
+	if len(ids) == 0 {
+		return []ContactUser{}, nil
+	}
+	var users []ContactUser
+	err := r.db.Where("id IN ?", ids).Find(&users).Error
+	return users, err
+}
+
+// RecallMessage đánh dấu tin nhắn là đã thu hồi (soft delete).
+// Chỉ người gửi mới có quyền thu hồi tin nhắn của chính mình.
+func (r *chatRepo) RecallMessage(msgID, senderID string) error {
+	res := r.db.Model(&Message{}).
+		Where("id = ? AND sender_id = ?", msgID, senderID).
+		Update("is_recalled", true)
 	if res.Error != nil {
 		return res.Error
 	}

@@ -33,7 +33,7 @@ func (h *NotificationHandler) GetMyNotifications(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Thành công", res)
 }
 
-// PUT /notifications/:id/read
+// PUT /notifications/:id/read – Đánh dấu một thông báo là đã đọc
 func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	notiID := c.Param("id")
@@ -45,4 +45,17 @@ func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 	}
 
 	response.Success(c, http.StatusOK, "Đã đánh dấu đọc", nil)
+}
+
+// PUT /notifications/read-all – Đánh dấu TẤT CẢ thông báo là đã đọc
+func (h *NotificationHandler) MarkAllAsRead(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+
+	err := h.service.MarkAllAsRead(userID.(string))
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(c, http.StatusOK, "Đã đánh dấu tất cả là đã đọc", nil)
 }

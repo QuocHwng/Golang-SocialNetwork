@@ -5,6 +5,7 @@ import "errors"
 type NotificationService interface {
 	GetMyNotifications(userID string) ([]NotificationResponse, error)
 	MarkAsRead(notiID string, userID string) error
+	MarkAllAsRead(userID string) error // Đánh dấu tất cả thông báo là đã đọc
 }
 
 type notificationService struct {
@@ -41,6 +42,13 @@ func (s *notificationService) GetMyNotifications(userID string) ([]NotificationR
 
 func (s *notificationService) MarkAsRead(notiID string, userID string) error {
 	if err := s.repo.MarkAsRead(notiID, userID); err != nil {
+		return errors.New("không thể cập nhật thông báo")
+	}
+	return nil
+}
+
+func (s *notificationService) MarkAllAsRead(userID string) error {
+	if err := s.repo.MarkAllAsRead(userID); err != nil {
 		return errors.New("không thể cập nhật thông báo")
 	}
 	return nil
