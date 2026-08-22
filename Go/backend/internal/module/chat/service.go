@@ -50,6 +50,10 @@ func (s *chatService) SendMessage(senderID, receiverID string, req SendMessageRe
 }
 
 func (s *chatService) GetMessages(user1, user2 string) ([]MessageRes, error) {
+	// user1 là người đang lấy tin nhắn, user2 là contact. 
+	// Đánh dấu các tin nhắn do user2 gửi cho user1 là đã đọc.
+	_ = s.repo.MarkMessagesAsRead(user2, user1)
+
 	msgs, err := s.repo.GetMessages(user1, user2)
 	if err != nil {
 		return nil, errors.New("lỗi tải tin nhắn")
@@ -76,16 +80,23 @@ func (s *chatService) GetContacts(userID string) ([]ContactRes, error) {
 		return nil, errors.New("lỗi tải danh sách liên hệ")
 	}
 
-	// Trước: vòng lặp FindByID mỗi lần 1 query → N+1
-	// Sau: 1 query IN (?) duy nhất
 	users, err := s.repo.FindContactsByIDs(ids)
 	if err != nil {
 		return nil, errors.New("lỗi tải thông tin liên hệ")
 	}
 
+	unreadCounts, _ := s.repo.GetUnreadCountPerContact(userID)
+
 	var res []ContactRes
 	for _, u := range users {
-		res = append(res, ContactRes{ID: u.ID, FullName: u.FullName, AvatarURL: u.AvatarURL})
+		isOnline := notification.SharedHub.IsOnline(u.ID)
+		res = append(res, ContactRes{
+			ID:          u.ID,
+			FullName:    u.FullName,
+			AvatarURL:   u.AvatarURL,
+			IsOnline:    isOnline,
+			UnreadCount: unreadCounts[u.ID],
+		})
 	}
 	return res, nil
 }

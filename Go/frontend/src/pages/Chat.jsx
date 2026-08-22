@@ -53,6 +53,7 @@ const Chat = () => {
             try {
                 const res = await axiosClient.get(`/chat/${activeContact.id}`);
                 setMessages(res.data.data || []);
+                setContacts(prev => prev.map(c => c.id === activeContact.id ? { ...c, unread_count: 0 } : c));
             } catch (error) {}
         };
         fetchMessages();
@@ -81,14 +82,30 @@ const Chat = () => {
             }
         };
 
+        const handleOnline = (e) => {
+            const userId = e.detail;
+            setContacts(prev => prev.map(c => c.id === userId ? { ...c, is_online: true } : c));
+            if (activeContact?.id === userId) setActiveContact(prev => ({ ...prev, is_online: true }));
+        };
+
+        const handleOffline = (e) => {
+            const userId = e.detail;
+            setContacts(prev => prev.map(c => c.id === userId ? { ...c, is_online: false } : c));
+            if (activeContact?.id === userId) setActiveContact(prev => ({ ...prev, is_online: false }));
+        };
+
         window.addEventListener('new_message', handleRealtimeMessage);
         window.addEventListener('recall_message', handleRecall);
         window.addEventListener('typing', handleTypingEvent);
+        window.addEventListener('user_online', handleOnline);
+        window.addEventListener('user_offline', handleOffline);
         
         return () => {
             window.removeEventListener('new_message', handleRealtimeMessage);
             window.removeEventListener('recall_message', handleRecall);
             window.removeEventListener('typing', handleTypingEvent);
+            window.removeEventListener('user_online', handleOnline);
+            window.removeEventListener('user_offline', handleOffline);
         };
     }, [activeContact]);
 
@@ -151,10 +168,20 @@ const Chat = () => {
                         ) : (
                             contacts.map(contact => (
                                 <div key={contact.id} onClick={() => setActiveContact(contact)} className={`flex items-center gap-4 p-4 cursor-pointer transition border-b border-stone-100 dark:border-stone-700/50 ${activeContact?.id === contact.id ? 'bg-lime-50 dark:bg-stone-700' : 'hover:bg-stone-100 dark:hover:bg-stone-700/50'}`}>
-                                    <AvatarDisplay url={contact.avatar_url} sizeClass="w-12 h-12" />
-                                    <div className="hidden sm:block overflow-hidden">
+                                    <div className="relative shrink-0">
+                                        <AvatarDisplay url={contact.avatar_url} sizeClass="w-12 h-12" />
+                                        {contact.is_online && (
+                                            <div className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-stone-800 rounded-full"></div>
+                                        )}
+                                    </div>
+                                    <div className="hidden sm:flex flex-col justify-center overflow-hidden flex-1">
                                         <h3 className={`font-bold truncate text-[15px] ${activeContact?.id === contact.id ? 'text-lime-700 dark:text-lime-400' : 'text-stone-800 dark:text-stone-200'}`}>{contact.full_name}</h3>
                                     </div>
+                                    {contact.unread_count > 0 && activeContact?.id !== contact.id && (
+                                        <div className="hidden sm:flex shrink-0 w-6 h-6 bg-rose-500 rounded-full text-white text-xs font-bold items-center justify-center">
+                                            {contact.unread_count > 99 ? '99+' : contact.unread_count}
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         )}
@@ -175,8 +202,16 @@ const Chat = () => {
                             {/* Header khung chat */}
                             <div className="p-4 border-b border-stone-100 dark:border-stone-700 flex items-center justify-between z-10 bg-white dark:bg-stone-800">
                                 <div className="flex items-center gap-3">
-                                    <AvatarDisplay url={activeContact.avatar_url} sizeClass="w-11 h-11 shadow-sm" />
-                                    <h3 className="font-bold text-stone-900 dark:text-white text-lg">{activeContact.full_name}</h3>
+                                    <div className="relative shrink-0">
+                                        <AvatarDisplay url={activeContact.avatar_url} sizeClass="w-11 h-11 shadow-sm" />
+                                        {activeContact.is_online && (
+                                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-stone-800 rounded-full"></div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-stone-900 dark:text-white text-lg leading-tight">{activeContact.full_name}</h3>
+                                        {activeContact.is_online && <span className="text-xs text-emerald-500 font-medium">Đang hoạt động</span>}
+                                    </div>
                                 </div>
                                 <div className="w-10 h-10 rounded-full hover:bg-stone-100 dark:hover:bg-stone-700 flex items-center justify-center cursor-pointer transition text-lime-500">
                                     <Info size={22} />

@@ -17,6 +17,8 @@ type UserService interface {
 	// Lấy danh sách người follow / đang follow
 	GetFollowers(userID string) ([]UserProfileResponse, error)
 	GetFollowing(userID string) ([]UserProfileResponse, error)
+	ToggleBlock(blockerID, blockedID string) (bool, error)
+	GetBlockedUsers(userID string) ([]UserProfileResponse, error)
 }
 
 type userService struct{ repo UserRepository }
@@ -100,6 +102,27 @@ func (s *userService) GetFollowers(userID string) ([]UserProfileResponse, error)
 	users, err := s.repo.GetFollowers(userID)
 	if err != nil {
 		return nil, errors.New("lỗi tải danh sách followers")
+	}
+	result := make([]UserProfileResponse, 0, len(users))
+	for _, u := range users {
+		result = append(result, UserProfileResponse{
+			ID: u.ID, Username: u.Username, FullName: u.FullName, AvatarURL: u.AvatarURL,
+		})
+	}
+	return result, nil
+}
+
+func (s *userService) ToggleBlock(blockerID, blockedID string) (bool, error) {
+	if blockerID == blockedID {
+		return false, errors.New("cannot block yourself")
+	}
+	return s.repo.ToggleBlock(blockerID, blockedID)
+}
+
+func (s *userService) GetBlockedUsers(userID string) ([]UserProfileResponse, error) {
+	users, err := s.repo.GetBlockedUsers(userID)
+	if err != nil {
+		return nil, errors.New("error fetching blocked users")
 	}
 	result := make([]UserProfileResponse, 0, len(users))
 	for _, u := range users {

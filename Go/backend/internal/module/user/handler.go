@@ -134,3 +134,30 @@ func (h *UserHandler) GetFollowing(c *gin.Context) {
 	}
 	response.Success(c, http.StatusOK, "Thành công", res)
 }
+
+func (h *UserHandler) ToggleBlock(c *gin.Context) {
+	blockerID, _ := c.Get("user_id")
+	blockedID := c.Param("id")
+
+	isBlocked, err := h.service.ToggleBlock(blockerID.(string), blockedID)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	
+	msg := "Đã chặn người dùng"
+	if !isBlocked {
+		msg = "Đã bỏ chặn người dùng"
+	}
+	response.Success(c, http.StatusOK, msg, gin.H{"is_blocked": isBlocked})
+}
+
+func (h *UserHandler) GetBlockedUsers(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+	res, err := h.service.GetBlockedUsers(userID.(string))
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.Success(c, http.StatusOK, "Danh sách người bị chặn", res)
+}

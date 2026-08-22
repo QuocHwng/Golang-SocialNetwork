@@ -84,10 +84,12 @@ func SetupRouter() *gin.Engine {
 		protected.GET("/profile", userHandler.GetProfile)
 		protected.PUT("/profile", userHandler.UpdateProfile)
 		protected.GET("/users/search", userHandler.SearchUsers)
+		protected.GET("/users/blocked", userHandler.GetBlockedUsers)  // [NEW] Danh sách người bị chặn
 		protected.GET("/users/:id", userHandler.GetUserProfile)
 		protected.GET("/users/:id/posts", postHandler.GetUserPosts)
 		protected.GET("/users/:id/followers", userHandler.GetFollowers) // [NEW] Danh sách followers
 		protected.GET("/users/:id/following", userHandler.GetFollowing) // [NEW] Danh sách following
+		protected.POST("/users/:id/block", userHandler.ToggleBlock)     // [NEW] Chặn người dùng
 
 		// ── Post ─────────────────────────────────────────────────────────
 		protected.POST("/posts", postHandler.CreatePost)

@@ -18,8 +18,10 @@ type MessageRes struct {
 }
 
 type ContactRes struct {
-	ID        string `json:"id"`
-	FullName  string `json:"full_name"`
-	AvatarURL string `json:"avatar_url"`
+	ID          string `json:"id"`
+	FullName    string `json:"full_name"`
+	AvatarURL   string `json:"avatar_url"`
+	IsOnline    bool   `json:"is_online"`
+	UnreadCount int    `json:"unread_count"`
 }
 
