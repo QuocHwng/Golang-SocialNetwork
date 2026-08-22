@@ -98,7 +98,10 @@ func (r *postRepo) GetNewsFeed(userID string, limit int, offset int) ([]Post, er
 	var posts []Post
 	err := r.db.Preload("Author").Preload("Media").
 		Preload("SharedPost").Preload("SharedPost.Author").Preload("SharedPost.Media").
-		Where("(user_id = ? OR user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)) AND group_id IS NULL", userID, userID).
+		Where(`(user_id = ? OR user_id IN (SELECT following_id FROM follows WHERE follower_id = ?)) 
+		AND user_id NOT IN (SELECT blocked_id FROM blocked_users WHERE blocker_id = ?) 
+		AND user_id NOT IN (SELECT blocker_id FROM blocked_users WHERE blocked_id = ?) 
+		AND group_id IS NULL`, userID, userID, userID, userID).
 		Order("created_at desc").Limit(limit).Offset(offset).Find(&posts).Error
 	return posts, err
 }

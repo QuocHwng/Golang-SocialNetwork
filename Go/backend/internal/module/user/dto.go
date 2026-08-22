@@ -32,6 +32,7 @@ type UserProfileResponse struct {
 	FollowersCount int    `json:"followers_count"`
 	FollowingCount int    `json:"following_count"`
 	IsFollowing    bool   `json:"is_following"`
+	IsBlocked      bool   `json:"is_blocked"`
 }
 
 // MỚI: Dữ liệu gửi lên khi sửa Profile

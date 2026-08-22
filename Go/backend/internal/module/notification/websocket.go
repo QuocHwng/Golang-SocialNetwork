@@ -36,24 +36,42 @@ func (h *Hub) SendToUser(userID string, message interface{}) {
 	}
 }
 
+// IsOnline kiểm tra user có đang kết nối Websocket không
+func (h *Hub) IsOnline(userID string) bool {
+	h.RLock()
+	defer h.RUnlock()
+	_, ok := h.Clients[userID]
+	return ok
+}
+
+// Broadcast gửi tin nhắn cho toàn bộ user đang online
+func (h *Hub) Broadcast(message interface{}) {
+	h.RLock()
+	defer h.RUnlock()
+	for _, conn := range h.Clients {
+		_ = conn.WriteJSON(message)
+	}
+}
+
 // ServeWS là API đón người dùng vào kết nối Realtime
 func ServeWS(c *gin.Context) {
 	// Lấy ID người dùng từ Middleware
 	userID, exists := c.Get("user_id")
-	if !exists {
-		return
-	}
+	if !exists { return }
 
 	// Nâng cấp từ HTTP lên WebSocket (Đường hầm kết nối liên tục)
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		return
-	}
+	if err != nil { return }
 
 	// Lưu user vào trạm phát sóng
 	SharedHub.Lock()
 	SharedHub.Clients[userID.(string)] = conn
 	SharedHub.Unlock()
+
+	SharedHub.Broadcast(map[string]interface{}{
+		"event":   "USER_ONLINE",
+		"user_id": userID,
+	})
 
 	// Lắng nghe khi user thoát web (Đóng kết nối) thì xóa họ khỏi trạm
 	go func() {
@@ -62,12 +80,15 @@ func ServeWS(c *gin.Context) {
 			delete(SharedHub.Clients, userID.(string))
 			SharedHub.Unlock()
 			conn.Close()
+
+			SharedHub.Broadcast(map[string]interface{}{
+				"event":   "USER_OFFLINE",
+				"user_id": userID,
+			})
 		}()
 		for {
 			// Nhận tin nhắn rác để giữ kết nối sống (Ping/Pong)
-			if _, _, err := conn.ReadMessage(); err != nil {
-				break
-			}
+			if _, _, err := conn.ReadMessage(); err != nil { break }
 		}
 	}()
 }

@@ -37,6 +37,8 @@ const MainLayout = () => {
             if (data.event === 'NEW_MESSAGE') window.dispatchEvent(new CustomEvent('new_message', { detail: data.message }));
             if (data.event === 'RECALL_MESSAGE') window.dispatchEvent(new CustomEvent('recall_message', { detail: data.message_id }));
             if (data.event === 'TYPING') window.dispatchEvent(new CustomEvent('typing', { detail: data.sender_id }));
+            if (data.event === 'USER_ONLINE') window.dispatchEvent(new CustomEvent('user_online', { detail: data.user_id }));
+            if (data.event === 'USER_OFFLINE') window.dispatchEvent(new CustomEvent('user_offline', { detail: data.user_id }));
         };
         return () => ws.close();
     }, []);

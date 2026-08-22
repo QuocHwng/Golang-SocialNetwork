@@ -1,6 +1,7 @@
 package user
 
 import (
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -31,11 +32,20 @@ type UserRepository interface {
 	// Lấy danh sách người follow / đang follow của một user
 	GetFollowers(userID string) ([]User, error)
 	GetFollowing(userID string) ([]User, error)
+
+	ToggleBlock(blockerID, blockedID string) (bool, error)
+	GetBlockedUsers(userID string) ([]User, error)
+	CheckIsBlocked(userA, userB string) bool
 }
 
 type userRepo struct{ db *gorm.DB }
 
-func NewUserRepository(db *gorm.DB) UserRepository { return &userRepo{db: db} }
+func NewUserRepository(db *gorm.DB) UserRepository { 
+	if err := db.AutoMigrate(&User{}, &BlockedUser{}); err != nil {
+		fmt.Printf("AutoMigrate User/BlockedUser failed: %v\n", err)
+	}
+	return &userRepo{db: db} 
+}
 
 func (r *userRepo) CreateUser(user *User) error { return r.db.Create(user).Error }
 func (r *userRepo) FindByEmail(email string) (*User, error) {
@@ -87,4 +97,53 @@ func (r *userRepo) GetFollowing(userID string) ([]User, error) {
 		Where("follows.follower_id = ?", userID).
 		Find(&users).Error
 	return users, err
+}
+
+// BlockedUser đại diện cho danh sách người bị chặn
+type BlockedUser struct {
+	BlockerID string    `gorm:"type:uuid;primaryKey"`
+	BlockedID string    `gorm:"type:uuid;primaryKey"`
+	CreatedAt time.Time
+}
+
+func (r *userRepo) ToggleBlock(blockerID, blockedID string) (bool, error) {
+	var blocked BlockedUser
+	err := r.db.Where("blocker_id = ? AND blocked_id = ?", blockerID, blockedID).First(&blocked).Error
+
+	if err == nil {
+		// Đã chặn -> Bỏ chặn
+		if err := r.db.Delete(&blocked).Error; err != nil {
+			return false, err
+		}
+		return false, nil
+	} else if err == gorm.ErrRecordNotFound {
+		// Chưa chặn -> Chặn
+		newBlock := BlockedUser{BlockerID: blockerID, BlockedID: blockedID}
+		if err := r.db.Create(&newBlock).Error; err != nil {
+			return false, err
+		}
+		
+		// Xóa follow 2 chiều nếu có khi block
+		r.db.Exec("DELETE FROM follows WHERE (follower_id = ? AND following_id = ?) OR (follower_id = ? AND following_id = ?)", blockerID, blockedID, blockedID, blockerID)
+		
+		return true, nil
+	}
+	return false, err
+}
+
+func (r *userRepo) GetBlockedUsers(userID string) ([]User, error) {
+	var users []User
+	err := r.db.
+		Joins("JOIN blocked_users ON blocked_users.blocked_id = users.id").
+		Where("blocked_users.blocker_id = ?", userID).
+		Find(&users).Error
+	return users, err
+}
+
+func (r *userRepo) CheckIsBlocked(userA, userB string) bool {
+	var count int64
+	r.db.Table("blocked_users").
+		Where("(blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)", userA, userB, userB, userA).
+		Count(&count)
+	return count > 0
 }

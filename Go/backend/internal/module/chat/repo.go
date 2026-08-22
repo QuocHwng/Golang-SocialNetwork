@@ -13,14 +13,16 @@ type Message struct {
 	Content    string
 	ImageURL   string    // Link ảnh đính kèm
 	IsRecalled bool      `gorm:"default:false"` // true = tin nhắn đã bị thu hồi (soft delete)
+	IsRead     bool      `gorm:"default:false"` // MỚI
 	CreatedAt  time.Time `gorm:"index"`
 }
 
 // ContactUser là view rút gọn của User, dùng để lấy thông tin liên hệ
 type ContactUser struct {
-	ID        string `gorm:"primaryKey"`
-	FullName  string
-	AvatarURL string
+	ID          string `gorm:"primaryKey"`
+	FullName    string
+	AvatarURL   string
+	UnreadCount int    `gorm:"-"`
 }
 
 func (ContactUser) TableName() string { return "users" }
@@ -32,6 +34,8 @@ type ChatRepository interface {
 	// FindContactsByIDs trả về thông tin user theo danh sách IDs — dùng thay cho N+1 query
 	FindContactsByIDs(ids []string) ([]ContactUser, error)
 	RecallMessage(msgID, senderID string) error // Soft-delete: đánh dấu thu hồi, không xóa DB
+	MarkMessagesAsRead(senderID, receiverID string) error
+	GetUnreadCountPerContact(userID string) (map[string]int, error)
 }
 
 type chatRepo struct{ db *gorm.DB }
@@ -84,4 +88,28 @@ func (r *chatRepo) RecallMessage(msgID, senderID string) error {
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+func (r *chatRepo) MarkMessagesAsRead(senderID, receiverID string) error {
+	return r.db.Model(&Message{}).
+		Where("sender_id = ? AND receiver_id = ? AND is_read = ?", senderID, receiverID, false).
+		Update("is_read", true).Error
+}
+
+func (r *chatRepo) GetUnreadCountPerContact(userID string) (map[string]int, error) {
+	var counts []struct {
+		SenderID string
+		Count    int
+	}
+	err := r.db.Model(&Message{}).Select("sender_id, count(*) as count").
+		Where("receiver_id = ? AND is_read = ?", userID, false).
+		Group("sender_id").Scan(&counts).Error
+	if err != nil {
+		return nil, err
+	}
+	res := make(map[string]int)
+	for _, c := range counts {
+		res[c.SenderID] = c.Count
+	}
+	return res, nil
 }

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axiosClient from '../services/api/axiosClient';
 import useAuthStore from '../store/useAuthStore';
-import { UserCircle, UserPlus, UserCheck, Heart, MessageCircle, Share2, Send, Image as ImageIcon, X, Trash2, Edit3, Camera, Loader2, MessageSquare, MoreHorizontal, Check, Smile, MapPin, Globe } from 'lucide-react';
+import { UserCircle, UserPlus, UserCheck, Heart, MessageCircle, Share2, Send, Image as ImageIcon, X, Trash2, Edit3, Camera, Loader2, MessageSquare, MoreHorizontal, Check, Smile, MapPin, Globe, Ban } from 'lucide-react';
 
 const Profile = () => {
     const { id } = useParams();
@@ -94,9 +94,22 @@ const Profile = () => {
     const handleToggleFollow = async () => {
         try {
             const res = await axiosClient.post(`/users/${id}/follow`);
-            const isFollowing = res.data.data.is_following;
-            setProfile(prev => ({ ...prev, is_following: isFollowing, followers_count: isFollowing ? prev.followers_count + 1 : prev.followers_count - 1 }));
-        } catch (error) {}
+            setProfile(prev => ({
+                ...prev,
+                is_following: res.data.data.is_following,
+                followers_count: res.data.data.is_following ? prev.followers_count + 1 : prev.followers_count - 1
+            }));
+        } catch (error) { console.error("Lỗi follow", error); }
+    };
+
+    const handleToggleBlock = async () => {
+        if (!window.confirm(profile.is_blocked ? "Bạn muốn bỏ chặn người dùng này?" : "Bạn có chắc chắn muốn chặn người dùng này?")) return;
+        try {
+            const res = await axiosClient.post(`/users/${id}/block`);
+            setProfile(prev => ({ ...prev, is_blocked: res.data.data.is_blocked }));
+            alert(res.data.message);
+            // Optionally, refresh feed if needed
+        } catch (error) { console.error("Lỗi block", error); }
     };
 
     const handleSaveProfile = async () => {
@@ -248,11 +261,14 @@ const Profile = () => {
 
                     {!isMyProfile && (
                         <div className="flex gap-2 justify-center md:mb-4">
-                            <button onClick={() => navigate('/chat', { state: { contact: profile } })} className="flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold transition shadow-sm bg-stone-100 dark:bg-stone-700 hover:bg-stone-200 dark:hover:bg-stone-600 text-stone-800 dark:text-stone-100">
+                            <button onClick={() => navigate('/chat', { state: { contact: profile } })} className="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold transition shadow-sm bg-stone-100 dark:bg-stone-700 hover:bg-stone-200 dark:hover:bg-stone-600 text-stone-800 dark:text-stone-100">
                                 <MessageSquare size={20} /> Nhắn tin
                             </button>
-                            <button onClick={handleToggleFollow} className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl font-bold transition shadow-sm ${profile.is_following ? 'bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-200 hover:bg-stone-300' : 'bg-lime-500 text-white hover:bg-lime-600 shadow-[0_4px_14px_rgba(132,204,22,0.39)]'}`}>
+                            <button onClick={handleToggleFollow} className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold transition shadow-sm ${profile.is_following ? 'bg-stone-200 dark:bg-stone-700 text-stone-800 dark:text-stone-200 hover:bg-stone-300' : 'bg-lime-500 text-white hover:bg-lime-600 shadow-[0_4px_14px_rgba(132,204,22,0.39)]'}`}>
                                 {profile.is_following ? <UserCheck size={20} /> : <UserPlus size={20} />} {profile.is_following ? 'Đang theo dõi' : 'Theo dõi'}
+                            </button>
+                            <button onClick={handleToggleBlock} className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold transition shadow-sm ${profile.is_blocked ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-[0_4px_14px_rgba(244,63,94,0.39)]' : 'bg-stone-100 dark:bg-stone-700 text-stone-800 dark:text-stone-100 hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-900/30'}`}>
+                                <Ban size={20} /> {profile.is_blocked ? 'Đã chặn' : 'Chặn'}
                             </button>
                         </div>
                     )}
@@ -314,7 +330,13 @@ const Profile = () => {
                     </div>
                 )}
 
-                {/* DANH SÁCH BÀI VIẾT */}
+                {profile.is_blocked ? (
+                    <div className="bg-white dark:bg-stone-800 p-10 text-center rounded-3xl border border-rose-100 dark:border-rose-900/30 text-rose-500 font-medium">
+                        Bạn đã chặn người dùng này, do đó bạn không thể xem bài viết của họ.
+                    </div>
+                ) : (
+                    <>
+                        {/* DANH SÁCH BÀI VIẾT */}
                 {posts.length > 0 && <h3 className="text-xl font-black text-stone-800 dark:text-stone-200 mb-4 px-2">Bài viết của {profile.full_name}</h3>}
                 
                 {posts.length === 0 ? (
@@ -453,6 +475,8 @@ const Profile = () => {
 
                 {loadingMore && <div className="flex justify-center py-6"><Loader2 className="animate-spin text-lime-500" size={36} /></div>}
                 {!hasMore && posts.length > 0 && <div className="text-center py-8 text-stone-400 font-medium">Bạn đã xem hết bài viết! 🥝</div>}
+                </>
+                )}
             </div>
 
             {/* ========================================================= */}
